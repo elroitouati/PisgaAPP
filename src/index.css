@@ -1,0 +1,153 @@
+@import 'tailwindcss';
+
+/* --------------------------------------------------------------------------
+ * Design tokens, taken verbatim from the Claude Design handoff
+ * (design/unpacked/design.html, turn 5 for light and turns 2-4 for dark).
+ *
+ * Handoff name → token here:
+ *   --bg      → bg            --tprim  → fg
+ *   --card    → surface       --tsec   → fg-muted
+ *   --cardhi  → surface-raised --tmut  → fg-subtle
+ *   --border  → line
+ *   --phys / --study / --social / --pers → cat-physical / -academic / -social / -personal
+ *
+ * The palette is monochrome-dominant per PRD 7; category colour is the only
+ * hue in the interface, at low-to-medium saturation.
+ * -------------------------------------------------------------------------- */
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* Heebo, self-hosted so the app keeps its typeface offline as an installed PWA.
+   One variable file per subset, sliced the same way Google Fonts slices it. */
+@font-face {
+  font-family: 'Heebo';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/heebo-hebrew.woff2') format('woff2');
+  unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F;
+}
+@font-face {
+  font-family: 'Heebo';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/heebo-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0,
+    U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Heebo';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/heebo-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+@theme {
+  --font-sans: 'Heebo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --color-bg: var(--pisga-bg);
+  --color-surface: var(--pisga-card);
+  --color-surface-raised: var(--pisga-cardhi);
+  --color-line: var(--pisga-border);
+  --color-fg: var(--pisga-tprim);
+  --color-fg-muted: var(--pisga-tsec);
+  --color-fg-subtle: var(--pisga-tmut);
+
+  /* Primary actions are the inverse of the page, not a brand hue. */
+  --color-brand: var(--pisga-tprim);
+  --color-on-brand: var(--pisga-bg);
+
+  --color-cat-physical: var(--pisga-phys);
+  --color-cat-academic: var(--pisga-study);
+  --color-cat-social: var(--pisga-social);
+  --color-cat-personal: var(--pisga-pers);
+
+  --color-success: var(--pisga-phys);
+  --color-danger: oklch(0.58 0.14 25);
+
+  --radius-card: 16px;
+  --radius-tile: 14px;
+  --radius-screen: 34px;
+}
+
+:root,
+[data-theme='light'] {
+  --pisga-bg: #fbfbfa;
+  --pisga-card: #f5f5f3;
+  --pisga-cardhi: #ecece9;
+  --pisga-border: #e4e4e1;
+  --pisga-tprim: #191a1c;
+  --pisga-tsec: #6c6e73;
+  --pisga-tmut: #a2a4a9;
+
+  --pisga-phys: oklch(0.6 0.06 150);
+  --pisga-study: oklch(0.55 0.07 258);
+  --pisga-social: oklch(0.56 0.075 335);
+  --pisga-pers: oklch(0.62 0.085 55);
+
+  /* Category tint behind an icon tile — mixed toward the page, per the handoff. */
+  --pisga-tint-base: #fff;
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --pisga-bg: #0d0e10;
+  --pisga-card: #16171a;
+  --pisga-cardhi: #1c1d21;
+  --pisga-border: #292b30;
+  --pisga-tprim: #eceae6;
+  --pisga-tsec: #8b8e93;
+  --pisga-tmut: #5b5d62;
+
+  --pisga-phys: oklch(0.75 0.05 150);
+  --pisga-study: oklch(0.72 0.055 258);
+  --pisga-social: oklch(0.72 0.055 335);
+  --pisga-pers: oklch(0.75 0.055 55);
+
+  --pisga-tint-base: #000;
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-bg text-fg font-sans antialiased;
+    overscroll-behavior-y: none;
+  }
+
+  :focus-visible {
+    @apply outline-fg outline-2 outline-offset-2;
+  }
+
+  button {
+    cursor: pointer;
+  }
+}
+
+@layer components {
+  /* The 15% category wash used behind every category icon tile. */
+  .cat-tint {
+    background: color-mix(in oklch, var(--cat) 15%, var(--pisga-tint-base));
+    color: var(--cat);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
