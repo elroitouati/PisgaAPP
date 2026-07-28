@@ -38,3 +38,8 @@ design/pisga.readable.html
 design/unpacked/*.png
 design/unpacked/*.woff2
 design/unpacked/*.javascript
+
+# Local screenshot / verification artifacts
+shot-*.png
+shot.mjs
+check.mjs

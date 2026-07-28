@@ -8,7 +8,9 @@ type AuthValue = {
   /** True until the initial session lookup resolves — gate routing on this. */
   initializing: boolean
   signInWithGoogle: () => Promise<void>
-  signInWithEmail: (email: string) => Promise<void>
+  signInWithPassword: (email: string, password: string) => Promise<void>
+  /** Resolves to true when Supabase still needs the address confirmed. */
+  signUpWithPassword: (email: string, password: string, displayName: string) => Promise<boolean>
   signOut: () => Promise<void>
 }
 
@@ -58,13 +60,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error
   }, [])
 
-  const signInWithEmail = useCallback(async (email: string) => {
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-    })
+  const signInWithPassword = useCallback(async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
   }, [])
+
+  const signUpWithPassword = useCallback(
+    async (email: string, password: string, displayName: string) => {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          // Read by the handle_new_user trigger to seed the profile row.
+          data: { display_name: displayName },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      })
+      if (error) throw error
+      // With email confirmation on, Supabase returns a user but no session.
+      return !data.session
+    },
+    [],
+  )
 
   const signOut = useCallback(async () => {
     const { error } = await supabase.auth.signOut()
@@ -77,10 +94,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: session?.user ?? null,
       initializing,
       signInWithGoogle,
-      signInWithEmail,
+      signInWithPassword,
+      signUpWithPassword,
       signOut,
     }),
-    [session, initializing, signInWithGoogle, signInWithEmail, signOut],
+    [session, initializing, signInWithGoogle, signInWithPassword, signUpWithPassword, signOut],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
