@@ -190,10 +190,7 @@ export default function SharedGoal() {
           <div className="text-fg-muted mb-3 text-[13px]">{t('shared.preview')}</div>
           <div className="flex items-center gap-2.5">
             <div className="flex">
-              <span
-                style={categoryStyle('personal')}
-                className="border-bg text-on-cat flex size-9 items-center justify-center rounded-full border-2 bg-[var(--cat)] text-[15px] font-bold"
-              >
+              <span className="border-bg flex size-9 items-center justify-center rounded-full border-2 bg-[#6b6d74] text-[15px] font-bold text-white">
                 {(profile?.display_name ?? '?').trim().charAt(0)}
               </span>
               <span

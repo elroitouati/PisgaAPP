@@ -329,11 +329,11 @@ function Avatar({
   const initial = name.trim().charAt(0) || '?'
 
   if (filled) {
+    // Fixed grey, not category-tinted — the design's latest export gives
+    // "you" a neutral placeholder regardless of theme, same as every other
+    // person's initial-avatar elsewhere in the app.
     return (
-      <div
-        style={categoryStyle('personal')}
-        className="text-on-cat flex size-11 flex-none items-center justify-center rounded-full bg-[var(--cat)] text-[17px] font-bold"
-      >
+      <div className="flex size-11 flex-none items-center justify-center rounded-full bg-[#6b6d74] text-[17px] font-bold text-white">
         {initial}
       </div>
     )
