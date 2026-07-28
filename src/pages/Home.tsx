@@ -6,7 +6,7 @@ import { useBadges } from '@/hooks/useBadges'
 import { CATEGORY_META } from '@/lib/categories'
 import { overallStreak } from '@/lib/scoring'
 import { useTotalPoints } from '@/hooks/usePoints'
-import { BellIcon, SummitIcon } from '@/components/icons'
+import { CalendarIcon, SummitIcon } from '@/components/icons'
 import {
   CategoryTile,
   EmptyState,
@@ -37,11 +37,11 @@ export default function Home() {
           <span className="text-[15px] font-extrabold tracking-[0.16em]">{t('app.wordmark')}</span>
         </div>
         <Link
-          to="/profile"
+          to="/calendar"
           className="border-line text-fg-muted flex size-[34px] items-center justify-center rounded-full border"
-          aria-label={t('nav.profile')}
+          aria-label={t('nav.calendar')}
         >
-          <BellIcon size={17} />
+          <CalendarIcon size={17} />
         </Link>
       </header>
 

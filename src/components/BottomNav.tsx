@@ -1,5 +1,11 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { HomeIcon, TrophyIcon, PlusIcon, FriendsIcon, ProfileIcon } from '@/components/icons'
+import {
+  HomeIcon,
+  TrophyIcon,
+  PlusIcon,
+  FriendsIcon,
+  ProfileIcon,
+} from '@/components/icons'
 import { useI18n } from '@/i18n/useI18n'
 import type { TranslationKey } from '@/i18n/translations'
 
@@ -9,6 +15,8 @@ const TABS = [
   { to: '/friends', icon: FriendsIcon, labelKey: 'nav.friends' },
   { to: '/profile', icon: ProfileIcon, labelKey: 'nav.profile' },
 ] satisfies { to: string; icon: typeof HomeIcon; labelKey: TranslationKey }[]
+
+
 
 /**
  * The fixed bottom bar from PRD 6.9. The add-goal control sits in the middle

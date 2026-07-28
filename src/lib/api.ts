@@ -9,7 +9,7 @@ import type {
   TrackedGoal,
   UserGoal,
 } from '@/types/db'
-import type { Category } from './categories'
+import { CATEGORIES, type Category } from './categories'
 
 function unwrap<T>({ data, error }: { data: T | null; error: { message: string } | null }): T {
   if (error) throw new Error(error.message)
@@ -247,4 +247,161 @@ export async function fetchMonthlyPoints(userId: string, category?: Category): P
   })
   if (error) throw new Error(error.message)
   return (data as number) ?? 0
+}
+
+// ── Calendar (design 6a / 6b) ────────────────────────────────────────────────
+
+export type CalendarDay = {
+  /** Local date key, YYYY-MM-DD. */
+  date: string
+  /** Distinct categories completed that day, in CATEGORIES order. */
+  categories: Category[]
+  entries: { goalId: string; title: string; category: Category; points: number; isCustom: boolean }[]
+}
+
+/**
+ * Every completion in one calendar month, grouped by day. The calendar needs
+ * the whole month at once, so this is a separate query from the two-day window
+ * the tracking screens use.
+ */
+export async function fetchMonth(userId: string, year: number, month: number) {
+  const first = `${year}-${String(month + 1).padStart(2, '0')}-01`
+  const nextMonth = month === 11 ? `${year + 1}-01-01` : `${year}-${String(month + 2).padStart(2, '0')}-01`
+
+  const goals = unwrap(
+    await supabase.from('user_goals').select('*').eq('user_id', userId),
+  ) as UserGoal[]
+
+  if (goals.length === 0) return new Map<string, CalendarDay>()
+
+  const completions = unwrap(
+    await supabase
+      .from('goal_completions')
+      .select('user_goal_id, completed_date')
+      .in('user_goal_id', goals.map((g) => g.id))
+      .gte('completed_date', first)
+      .lt('completed_date', nextMonth),
+  ) as { user_goal_id: string; completed_date: string }[]
+
+  const byId = new Map(goals.map((goal) => [goal.id, goal]))
+  const days = new Map<string, CalendarDay>()
+
+  for (const completion of completions) {
+    const goal = byId.get(completion.user_goal_id)
+    if (!goal) continue
+
+    const day = days.get(completion.completed_date) ?? {
+      date: completion.completed_date,
+      categories: [],
+      entries: [],
+    }
+    if (!day.categories.includes(goal.category)) day.categories.push(goal.category)
+    day.entries.push({
+      goalId: goal.id,
+      title: goal.title,
+      category: goal.category,
+      points: goal.points,
+      isCustom: goal.is_custom,
+    })
+    days.set(completion.completed_date, day)
+  }
+
+  // Keep the dot order stable so a day's dots don't reshuffle between renders.
+  for (const day of days.values()) {
+    day.categories.sort((a, b) => CATEGORIES.indexOf(a) - CATEGORIES.indexOf(b))
+  }
+
+  return days
+}
+
+// ── Friends (PRD 6.7, design 5e / 2e) ────────────────────────────────────────
+
+export type FriendProgress = {
+  id: string
+  displayName: string
+  avatarUrl: string | null
+  doneToday: number
+  totalToday: number
+  streak: number
+  categories: Category[]
+}
+
+/**
+ * Accepted friends with today's progress. RLS already limits this to people
+ * the caller is actually friends with, so the query does not re-check it.
+ */
+export async function fetchFriends(userId: string): Promise<FriendProgress[]> {
+  const links = unwrap(
+    await supabase
+      .from('friendships')
+      .select('user_id, friend_id')
+      .eq('status', 'accepted')
+      .or(`user_id.eq.${userId},friend_id.eq.${userId}`),
+  ) as { user_id: string; friend_id: string }[]
+
+  const friendIds = links.map((link) => (link.user_id === userId ? link.friend_id : link.user_id))
+  if (friendIds.length === 0) return []
+
+  const [profiles, goals] = await Promise.all([
+    supabase.from('profiles').select('id, display_name, avatar_url').in('id', friendIds),
+    supabase.from('user_goals').select('id, user_id, category').in('user_id', friendIds).eq('active', true),
+  ])
+
+  const people = unwrap(profiles) as { id: string; display_name: string | null; avatar_url: string | null }[]
+  const theirGoals = unwrap(goals) as { id: string; user_id: string; category: Category }[]
+
+  const completions =
+    theirGoals.length === 0
+      ? []
+      : (unwrap(
+          await supabase
+            .from('goal_completions')
+            .select('user_goal_id, current_streak')
+            .in('user_goal_id', theirGoals.map((g) => g.id))
+            .eq('completed_date', todayKey()),
+        ) as { user_goal_id: string; current_streak: number }[])
+
+  const doneIds = new Map(completions.map((c) => [c.user_goal_id, c.current_streak]))
+
+  return people.map((person) => {
+    const mine = theirGoals.filter((goal) => goal.user_id === person.id)
+    const done = mine.filter((goal) => doneIds.has(goal.id))
+    return {
+      id: person.id,
+      displayName: person.display_name ?? '',
+      avatarUrl: person.avatar_url,
+      doneToday: done.length,
+      totalToday: mine.length,
+      streak: done.reduce((best, goal) => Math.max(best, doneIds.get(goal.id) ?? 0), 0),
+      categories: CATEGORIES.filter((category) =>
+        done.some((goal) => goal.category === category),
+      ),
+    }
+  })
+}
+
+/** Sends a friend request. The addressee accepts it on their side. */
+export async function requestFriendship(userId: string, friendId: string): Promise<void> {
+  const { error } = await supabase
+    .from('friendships')
+    .insert({ user_id: userId, friend_id: friendId })
+  if (error) throw new Error(error.message)
+}
+
+export async function respondToFriendRequest(friendshipId: string, accept: boolean): Promise<void> {
+  const { error } = accept
+    ? await supabase
+        .from('friendships')
+        .update({ status: 'accepted', responded_at: new Date().toISOString() })
+        .eq('id', friendshipId)
+    : await supabase.from('friendships').delete().eq('id', friendshipId)
+  if (error) throw new Error(error.message)
+}
+
+/** Shares one of my goals with a friend (design 4b). */
+export async function shareGoal(userGoalId: string, friendId: string): Promise<void> {
+  const { error } = await supabase
+    .from('goal_shares')
+    .insert({ user_goal_id: userGoalId, shared_with_user_id: friendId })
+  if (error) throw new Error(error.message)
 }

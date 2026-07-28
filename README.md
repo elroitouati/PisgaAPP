@@ -48,7 +48,7 @@ src/
   lib/           supabase, api (שאילתות), categories, scoring, dates, quotes
   components/    ui, icons, GoalRow, BottomNav, AppShell
   pages/         Login, Onboarding, Home, CategoryScreen, GuidedSession,
-                 Library, Achievements, Profile
+                 Library, Achievements, Calendar, Friends, Profile
 supabase/
   migrations/    סכמה + seed
   tests/         harness + בדיקות RLS
@@ -103,3 +103,8 @@ scripts/
 - **שלושה ייחוסי ציטוט שנויים במחלוקת** — מסומנים `disputed` ב‑`src/lib/quotes.ts`
   (אריסטו/ויל דוראנט, לינקולן, ושם המחבר של הציטוט הראשון).
 - **סנכרון צעדים** — מטרות `sensor_sync` מציגות שהחיבור אינו קיים במקום לקבל דיווח עצמי.
+- **צ׳אט בין חברים (מסך 4c)** — מופיע בעיצוב אך לא ב‑PRD. פיצ׳ר חדש שדורש טבלאות
+  ומדיניות משלו; לא נבנה.
+- **אתגרים משותפים ומסך 4b** — התשתית (`goal_shares`) והבאדג׳ קיימים, המסכים לא.
+- **ציר הזמן בלוח השנה** — PRD 6.5 מבקש גם מטרות עם תאריך יעד ואבני דרך;
+  העיצוב מצייר רק את רשת ההשלמות היומיות, אז זה מה שנבנה.

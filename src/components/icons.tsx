@@ -182,3 +182,18 @@ export const FlameIcon = (p: IconProps) => (
 
 export const TargetIcon = PersonalIcon
 export const ActivityIcon = PhysicalIcon
+
+export const AddFriendIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="10" cy="8" r="3.4" />
+    <path d="M4 19a6 6 0 0 1 12 0" />
+    <path d="M18 8v6M15 11h6" />
+  </Icon>
+)
+
+export const CalendarIcon = (p: IconProps) => (
+  <Icon strokeWidth={1.6} {...p}>
+    <rect x="4" y="5" width="16" height="15" rx="2" />
+    <path d="M4 10h16M9 3v4M15 3v4" />
+  </Icon>
+)
