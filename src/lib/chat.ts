@@ -190,3 +190,81 @@ export async function unblockUser(userId: string): Promise<void> {
   const { error } = await supabase.rpc('unblock_user', { p_user_id: userId })
   if (error) throw new Error(error.message)
 }
+
+// ── Group management (owner-only) ───────────────────────────────────────────
+
+export async function setGroupPostingMode(
+  conversationId: string,
+  membersCanPost: boolean,
+): Promise<void> {
+  const { error } = await supabase.rpc('set_group_posting_mode', {
+    p_conversation_id: conversationId,
+    p_members_can_post: membersCanPost,
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function addGroupMember(conversationId: string, userId: string): Promise<void> {
+  const { error } = await supabase.rpc('add_group_member', {
+    p_conversation_id: conversationId,
+    p_user_id: userId,
+  })
+  if (error) throw new Error(error.message)
+}
+
+export async function removeGroupMember(conversationId: string, userId: string): Promise<void> {
+  const { error } = await supabase.rpc('remove_group_member', {
+    p_conversation_id: conversationId,
+    p_user_id: userId,
+  })
+  if (error) throw new Error(error.message)
+}
+
+export type ConversationDetail = {
+  id: string
+  kind: 'direct' | 'group' | 'challenge'
+  title: string | null
+  createdBy: string
+  membersCanPost: boolean
+  memberIds: string[]
+}
+
+export type MemberProfile = { id: string; display_name: string | null; avatar_url: string | null }
+
+/** Names/avatars for the group-management sheet's member list. */
+export async function fetchMemberProfiles(memberIds: string[]): Promise<MemberProfile[]> {
+  if (memberIds.length === 0) return []
+  return unwrap(
+    await supabase.from('profiles').select('id, display_name, avatar_url').in('id', memberIds),
+  )
+}
+
+/** Full membership + settings for the group-management sheet. */
+export async function fetchConversationDetail(conversationId: string): Promise<ConversationDetail> {
+  const [conversation, members] = await Promise.all([
+    supabase
+      .from('conversations')
+      .select('id, kind, title, created_by, members_can_post')
+      .eq('id', conversationId)
+      .single(),
+    supabase.from('conversation_members').select('user_id').eq('conversation_id', conversationId),
+  ])
+
+  const c = unwrap(conversation) as {
+    id: string
+    kind: 'direct' | 'group' | 'challenge'
+    title: string | null
+    created_by: string
+    members_can_post: boolean
+  }
+  const rows = unwrap(members) as { user_id: string }[]
+
+  return {
+    id: c.id,
+    kind: c.kind,
+    title: c.title,
+    createdBy: c.created_by,
+    membersCanPost: c.members_can_post,
+    memberIds: rows.map((r) => r.user_id),
+  }
+}

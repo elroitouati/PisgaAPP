@@ -464,3 +464,225 @@ export async function fetchSuggestions(userId: string, limit = 6): Promise<Libra
 
   return spread.slice(0, limit)
 }
+
+// ── Invite links (PRD decision: permanent, revocable, auto-accept) ──────────
+
+export type InviteCode = { id: string; token: string; created_at: string }
+
+export async function fetchMyInviteCode(): Promise<InviteCode> {
+  return unwrap(await supabase.rpc('my_invite_code').single())
+}
+
+export async function regenerateInviteCode(): Promise<InviteCode> {
+  return unwrap(await supabase.rpc('regenerate_invite_code').single())
+}
+
+/** Redeems a link, returning the profile of the friend it came from. */
+export async function redeemInvite(token: string): Promise<Profile> {
+  return unwrap(await supabase.rpc('redeem_invite', { p_token: token }).single())
+}
+
+export type InvitePreview = { display_name: string | null; avatar_url: string | null }
+
+/** Who is inviting you — callable while signed out (design 8o/8p). */
+export async function fetchInvitePreview(token: string): Promise<InvitePreview | null> {
+  const { data, error } = await supabase.rpc('invite_preview', { p_token: token }).maybeSingle()
+  if (error) throw new Error(error.message)
+  return data as InvitePreview | null
+}
+
+// ── Avatar upload ─────────────────────────────────────────────────────────
+
+/**
+ * Uploads to `<user_id>/<timestamp>.<ext>` — the storage policies key off that
+ * first path segment, and the timestamp avoids a stale CDN-cached URL after a
+ * replacement photo.
+ */
+export async function uploadAvatar(userId: string, file: File): Promise<string> {
+  const ext = file.name.split('.').pop() ?? 'jpg'
+  const path = `${userId}/${Date.now()}.${ext}`
+
+  const { error: uploadError } = await supabase.storage.from('avatars').upload(path, file, {
+    contentType: file.type,
+    upsert: true,
+  })
+  if (uploadError) throw new Error(uploadError.message)
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from('avatars').getPublicUrl(path)
+
+  const updated = unwrap<{ avatar_url: string | null }>(
+    await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', userId).select().single(),
+  )
+  return updated.avatar_url ?? publicUrl
+}
+
+export async function removeAvatar(userId: string): Promise<void> {
+  const { error } = await supabase.from('profiles').update({ avatar_url: null }).eq('id', userId)
+  if (error) throw new Error(error.message)
+}
+
+// ── My goals (design 8g/8h) ──────────────────────────────────────────────
+
+export type ManagedGoal = UserGoal & { streak: number; completions: number }
+
+/** Every goal the user owns, active or archived, with lifetime stats. */
+export async function fetchManagedGoals(userId: string, active: boolean): Promise<ManagedGoal[]> {
+  const goals = unwrap(
+    await supabase.from('user_goals').select('*').eq('user_id', userId).eq('active', active),
+  ) as UserGoal[]
+
+  if (goals.length === 0) return []
+
+  const completions = unwrap(
+    await supabase
+      .from('goal_completions')
+      .select('user_goal_id, current_streak')
+      .in('user_goal_id', goals.map((g) => g.id))
+      .order('completed_date', { ascending: false }),
+  ) as { user_goal_id: string; current_streak: number }[]
+
+  const latestStreak = new Map<string, number>()
+  const totalCompletions = new Map<string, number>()
+  for (const row of completions) {
+    if (!latestStreak.has(row.user_goal_id)) latestStreak.set(row.user_goal_id, row.current_streak)
+    totalCompletions.set(row.user_goal_id, (totalCompletions.get(row.user_goal_id) ?? 0) + 1)
+  }
+
+  return goals.map((goal) => ({
+    ...goal,
+    streak: latestStreak.get(goal.id) ?? 0,
+    completions: totalCompletions.get(goal.id) ?? 0,
+  }))
+}
+
+export async function unarchiveGoal(goalId: string): Promise<void> {
+  const { error } = await supabase.rpc('unarchive_goal', { p_user_goal_id: goalId })
+  if (error) throw new Error(error.message)
+}
+
+export type ActiveChallenge = {
+  id: string
+  title: string
+  category: Category
+  targetDate: string
+  otherName: string
+}
+
+/**
+ * Accepted, still-open shared challenges — mine or ones a friend shared with
+ * me. Two flat queries rather than one embedded join, matching how
+ * fetchConversations resolves names, since RLS already scopes each table to
+ * what the caller may see.
+ */
+export async function fetchActiveChallenges(userId: string): Promise<ActiveChallenge[]> {
+  const [owned, received] = await Promise.all([
+    supabase
+      .from('goal_shares')
+      .select('shared_with_user_id, user_goals!inner(id, title, category, target_date, active, user_id)')
+      .eq('status', 'accepted')
+      .eq('user_goals.user_id', userId)
+      .eq('user_goals.active', true)
+      .not('user_goals.target_date', 'is', null),
+    supabase
+      .from('goal_shares')
+      .select('user_goals!inner(id, title, category, target_date, active, user_id)')
+      .eq('status', 'accepted')
+      .eq('shared_with_user_id', userId)
+      .eq('user_goals.active', true)
+      .not('user_goals.target_date', 'is', null),
+  ])
+
+  type GoalRow = { id: string; title: string; category: Category; target_date: string; user_id: string }
+  type OwnedRow = { shared_with_user_id: string; user_goals: GoalRow[] }
+  type ReceivedRow = { user_goals: GoalRow[] }
+
+  const ownedRows = unwrap(owned) as unknown as OwnedRow[]
+  const receivedRows = unwrap(received) as unknown as ReceivedRow[]
+
+  const otherIds = new Set([
+    ...ownedRows.map((row) => row.shared_with_user_id),
+    ...receivedRows.map((row) => row.user_goals[0]?.user_id).filter((id): id is string => Boolean(id)),
+  ])
+  const names = new Map<string, string>()
+  if (otherIds.size > 0) {
+    const people = unwrap(
+      await supabase.from('profiles').select('id, display_name').in('id', [...otherIds]),
+    ) as { id: string; display_name: string | null }[]
+    for (const person of people) names.set(person.id, person.display_name ?? '')
+  }
+
+  const fromOwned = ownedRows
+    .filter((row) => row.user_goals[0])
+    .map((row) => ({
+      id: row.user_goals[0].id,
+      title: row.user_goals[0].title,
+      category: row.user_goals[0].category,
+      targetDate: row.user_goals[0].target_date,
+      otherName: names.get(row.shared_with_user_id) ?? '',
+    }))
+  const fromReceived = receivedRows
+    .filter((row) => row.user_goals[0])
+    .map((row) => ({
+      id: row.user_goals[0].id,
+      title: row.user_goals[0].title,
+      category: row.user_goals[0].category,
+      targetDate: row.user_goals[0].target_date,
+      otherName: names.get(row.user_goals[0].user_id) ?? '',
+    }))
+
+  return [...fromOwned, ...fromReceived]
+}
+
+// ── Privacy & data ───────────────────────────────────────────────────────
+
+export type BlockedUser = { id: string; display_name: string | null }
+
+export async function fetchBlockedUsers(userId: string): Promise<BlockedUser[]> {
+  const rows = unwrap(
+    await supabase.from('blocks').select('blocked_id').eq('blocker_id', userId),
+  ) as { blocked_id: string }[]
+  if (rows.length === 0) return []
+
+  return unwrap(
+    await supabase.from('profiles').select('id, display_name').in('id', rows.map((r) => r.blocked_id)),
+  )
+}
+
+/**
+ * Bundles everything the account owns into one JSON object for download
+ * (design 8d "הורדת הנתונים שלי"). Reads only tables RLS already lets the
+ * caller see as themself — no new access, just an export of it.
+ */
+export async function exportMyData(userId: string) {
+  const [profile, goals, completions, badges, friendships] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', userId).single(),
+    supabase.from('user_goals').select('*').eq('user_id', userId),
+    supabase
+      .from('goal_completions')
+      .select('*, user_goals!inner(user_id)')
+      .eq('user_goals.user_id', userId),
+    supabase.from('user_badges').select('*, badges(*)').eq('user_id', userId),
+    supabase.from('friendships').select('*').or(`user_id.eq.${userId},friend_id.eq.${userId}`),
+  ])
+
+  return {
+    exported_at: new Date().toISOString(),
+    profile: unwrap(profile),
+    goals: unwrap(goals),
+    completions: unwrap(completions),
+    badges: unwrap(badges),
+    friendships: unwrap(friendships),
+  }
+}
+
+/**
+ * Deletes everything the client is able to (see 0006_profile_features.sql).
+ * The auth.users row itself needs the service-role key and is left for a
+ * server-side job — this does not sign the user out or finish the deletion.
+ */
+export async function requestAccountDeletion(): Promise<void> {
+  const { error } = await supabase.rpc('request_account_deletion')
+  if (error) throw new Error(error.message)
+}

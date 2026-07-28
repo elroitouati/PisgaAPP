@@ -231,6 +231,104 @@ const he = {
 
   'notFound.title': 'הדף לא נמצא',
   'notFound.back': 'חזרה לדף הבית',
+
+  // Profile main — settings rows (design 5k)
+  'profile.menu.edit': 'עריכת פרופיל',
+  'profile.menu.notifications': 'התראות ותזכורות',
+  'profile.menu.privacy': 'פרטיות ונתונים',
+  'profile.menu.myGoals': 'המטרות שלי',
+  'profile.menu.invite': 'הזמנת חבר',
+
+  // Edit profile (design 8a/8b)
+  'profile.edit.title': 'עריכת פרופיל',
+  'profile.edit.hint': 'הקישי על התמונה לשינוי',
+  'profile.edit.displayName': 'שם תצוגה',
+  'profile.edit.sheetTitle': 'תמונת פרופיל',
+  'profile.edit.takePhoto': 'צילום תמונה',
+  'profile.edit.uploadPhoto': 'העלאת תמונה',
+  'profile.edit.removePhoto': 'הסרת תמונה',
+  'profile.edit.saved': 'נשמר',
+  'profile.edit.error': 'השמירה נכשלה',
+
+  // Privacy & data (design 8c/8d)
+  'privacy.title': 'פרטיות ונתונים',
+  'privacy.blockedUsers': 'משתמשים חסומים',
+  'privacy.blockedEmpty': 'אין משתמשים חסומים כרגע',
+  'privacy.unblock': 'ביטול חסימה',
+  'privacy.downloadData': 'הורדת הנתונים שלי',
+  'privacy.deleteAccount': 'מחיקת חשבון',
+  'privacy.deleteIrreversible': 'פעולה זו אינה הפיכה',
+
+  // Delete account confirm (design 8e/8f)
+  'delete.title': 'מחיקת חשבון',
+  'delete.irreversible': 'הפעולה בלתי הפיכה',
+  'delete.body':
+    'מחיקת החשבון תסיר לצמיתות את כל המטרות, ההישגים, ההיסטוריה וההתכתבויות שלך עם חברים. לא ניתן לשחזר את המידע לאחר האישור.',
+  'delete.confirmLabel': 'הקלידי "מחק" לאישור',
+  'delete.confirmWord': 'מחק',
+  'delete.button': 'מחיקת החשבון לצמיתות',
+  'delete.error': 'המחיקה נכשלה. נסו שוב.',
+
+  // My goals (design 8g/8h)
+  'goals.title': 'המטרות שלי',
+  'goals.active': 'פעילות',
+  'goals.archived': 'בארכיון',
+  'goals.streak': 'רצף',
+  'goals.completions': 'השלמות',
+  'goals.added': 'נוספה',
+  'goals.emptyActive': 'אין כאן מטרות פעילות עדיין.',
+  'goals.emptyArchived': 'אין מטרות בארכיון.',
+  'goals.activeChallenges': 'אתגרים משותפים פעילים',
+  'goals.endsInPrefix': 'מסתיים בעוד',
+  'goals.daysUnit': 'ימים',
+  'goals.archiveAction': 'העברה לארכיון',
+  'goals.unarchiveAction': 'החזרה מארכיון',
+
+  // iOS push explainer (design 8i/8j)
+  'push.title': 'קבלו תזכורות גם באייפון',
+  'push.body':
+    'כדי לקבל התראות על מטרות ותזכורות יומיות, הוסיפו את Pisga למסך הבית — לוקח 10 שניות.',
+  'push.step1': 'הקישו על סמל השיתוף בשורת הדפדפן',
+  'push.step2': 'בחרו "הוסף למסך הבית"',
+  'push.done': 'הבנתי',
+  'push.enableTitle': 'קבלו התראות מ‑Pisga',
+  'push.enableBody': 'נתריע לכם על באדג׳ שהושג, מטרה שהושלמה ותזכורת אם שכחתם יום.',
+  'push.enableButton': 'הפעלת התראות',
+  'push.enabled': 'ההתראות פעילות',
+  'push.denied': 'ההתראות חסומות בהגדרות המכשיר',
+
+  // Invite a friend (design 8k/8l)
+  'invite.title': 'הזמנת חבר',
+  'invite.headline': 'טפסו לפסגה ביחד',
+  'invite.body': 'הזמינו חבר או חברה ל‑Pisga, השוו התקדמות ופתחו אתגרים משותפים.',
+  'invite.copy': 'העתקה',
+  'invite.copied': 'הועתק',
+  'invite.whatsapp': 'וואטסאפ',
+  'invite.more': 'עוד',
+  'invite.regenerate': 'יצירת קישור חדש',
+  'invite.regenerateConfirm': 'הקישור הישן יפסיק לעבוד. ליצור קישור חדש?',
+  'invite.regenerateError': 'יצירת הקישור נכשלה',
+
+  // Join landing (design 8m-8p)
+  'join.invitedYouSuffix': 'הזמין אותך',
+  'join.invitesYouSuffix': 'מזמין אותך',
+  'join.becameFriends': 'הפכתם לחברים ב‑Pisga.\nעכשיו אפשר להשוות התקדמות ולפתוח אתגר משותף.',
+  'join.backToApp': 'חזרה לאפליקציה',
+  'join.inviteBody': 'להצטרף ל‑Pisga ולהתחיל לטפס יחד לעבר המטרות שלכם.',
+  'join.autoFriendSuffix': 'תתחברי אוטומטית כחברים ב‑Pisga',
+  'join.invalid': 'קישור ההזמנה הזה אינו תקף עוד.',
+  'join.ownLink': 'זהו קישור ההזמנה שלך.',
+  'join.loading': 'טוען הזמנה…',
+
+  // Group management (undesigned settings sheet)
+  'group.manage': 'ניהול קבוצה',
+  'group.postingMode': 'רק אני יכול לכתוב',
+  'group.postingModeSub': 'כשזה פעיל, רק את/ה יכולים לשלוח הודעות בקבוצה',
+  'group.members': 'חברים בקבוצה',
+  'group.addMember': 'הוספת חבר',
+  'group.removeMember': 'הסרה',
+  'group.noFriendsToAdd': 'כל החברים שלך כבר בקבוצה',
+  'group.owner': 'הבעלים',
 } as const
 
 export type TranslationKey = keyof typeof he
@@ -453,6 +551,96 @@ const en: Record<TranslationKey, string> = {
 
   'notFound.title': 'Page not found',
   'notFound.back': 'Back to home',
+
+  'profile.menu.edit': 'Edit profile',
+  'profile.menu.notifications': 'Notifications & reminders',
+  'profile.menu.privacy': 'Privacy & data',
+  'profile.menu.myGoals': 'My goals',
+  'profile.menu.invite': 'Invite a friend',
+
+  'profile.edit.title': 'Edit profile',
+  'profile.edit.hint': 'Tap the photo to change it',
+  'profile.edit.displayName': 'Display name',
+  'profile.edit.sheetTitle': 'Profile photo',
+  'profile.edit.takePhoto': 'Take a photo',
+  'profile.edit.uploadPhoto': 'Upload a photo',
+  'profile.edit.removePhoto': 'Remove photo',
+  'profile.edit.saved': 'Saved',
+  'profile.edit.error': 'Could not save',
+
+  'privacy.title': 'Privacy & data',
+  'privacy.blockedUsers': 'Blocked users',
+  'privacy.blockedEmpty': 'No one is blocked right now',
+  'privacy.unblock': 'Unblock',
+  'privacy.downloadData': 'Download my data',
+  'privacy.deleteAccount': 'Delete account',
+  'privacy.deleteIrreversible': 'This action cannot be undone',
+
+  'delete.title': 'Delete account',
+  'delete.irreversible': 'This is irreversible',
+  'delete.body':
+    'Deleting your account permanently removes all goals, achievements, history and conversations with friends. This cannot be undone once confirmed.',
+  'delete.confirmLabel': 'Type "delete" to confirm',
+  'delete.confirmWord': 'delete',
+  'delete.button': 'Permanently delete account',
+  'delete.error': 'Deletion failed. Please try again.',
+
+  'goals.title': 'My goals',
+  'goals.active': 'Active',
+  'goals.archived': 'Archived',
+  'goals.streak': 'streak',
+  'goals.completions': 'completions',
+  'goals.added': 'added',
+  'goals.emptyActive': 'No active goals yet.',
+  'goals.emptyArchived': 'Nothing in the archive.',
+  'goals.activeChallenges': 'Active shared challenges',
+  'goals.endsInPrefix': 'Ends in',
+  'goals.daysUnit': 'days',
+  'goals.archiveAction': 'Move to archive',
+  'goals.unarchiveAction': 'Restore from archive',
+
+  'push.title': 'Get reminders on iPhone too',
+  'push.body':
+    'To get notified about goals and daily reminders, add Pisga to your home screen — it takes 10 seconds.',
+  'push.step1': 'Tap the share icon in the browser bar',
+  'push.step2': 'Choose "Add to Home Screen"',
+  'push.done': 'Got it',
+  'push.enableTitle': 'Get notified by Pisga',
+  'push.enableBody':
+    'We’ll let you know about a new badge, a finished goal, and a reminder if you forget a day.',
+  'push.enableButton': 'Enable notifications',
+  'push.enabled': 'Notifications are on',
+  'push.denied': 'Notifications are blocked in your device settings',
+
+  'invite.title': 'Invite a friend',
+  'invite.headline': 'Climb to the summit together',
+  'invite.body': 'Invite a friend to Pisga, compare progress and start joint challenges.',
+  'invite.copy': 'Copy',
+  'invite.copied': 'Copied',
+  'invite.whatsapp': 'WhatsApp',
+  'invite.more': 'More',
+  'invite.regenerate': 'Create a new link',
+  'invite.regenerateConfirm': 'The old link will stop working. Create a new one?',
+  'invite.regenerateError': 'Could not create a new link',
+
+  'join.invitedYouSuffix': 'invited you',
+  'join.invitesYouSuffix': 'invites you',
+  'join.becameFriends': 'You’re now friends on Pisga.\nCompare progress and start a shared challenge.',
+  'join.backToApp': 'Back to the app',
+  'join.inviteBody': 'to join Pisga and start climbing toward your goals together.',
+  'join.autoFriendSuffix': 'you’ll automatically become friends on Pisga',
+  'join.invalid': 'This invite link is no longer valid.',
+  'join.ownLink': 'This is your own invite link.',
+  'join.loading': 'Loading invite…',
+
+  'group.manage': 'Manage group',
+  'group.postingMode': 'Only I can post',
+  'group.postingModeSub': 'When on, only you can send messages in this group',
+  'group.members': 'Group members',
+  'group.addMember': 'Add a member',
+  'group.removeMember': 'Remove',
+  'group.noFriendsToAdd': 'All your friends are already in this group',
+  'group.owner': 'Owner',
 }
 
 export const translations: Record<Lang, Record<TranslationKey, string>> = { he, en }

@@ -41,3 +41,36 @@ stable
 as $$
   select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
 $$;
+
+-- Minimal stand-in for Supabase Storage — just enough for the avatars bucket
+-- policies in 0006_profile_features.sql to install and be tested.
+create schema if not exists storage;
+grant usage on schema storage to anon, authenticated, service_role;
+alter default privileges in schema storage grant all on tables to anon, authenticated, service_role;
+
+create table if not exists storage.buckets (
+  id                 text primary key,
+  name               text not null,
+  public             boolean not null default false,
+  file_size_limit    bigint,
+  allowed_mime_types text[]
+);
+
+create table if not exists storage.objects (
+  id         uuid primary key default gen_random_uuid(),
+  bucket_id  text references storage.buckets (id),
+  name       text not null,
+  owner      uuid,
+  created_at timestamptz not null default now()
+);
+
+alter table storage.objects enable row level security;
+
+-- The real extension splits a storage path on '/'; same behaviour, SQL-only.
+create or replace function storage.foldername(name text)
+returns text[]
+language sql
+immutable
+as $$
+  select string_to_array(name, '/');
+$$;

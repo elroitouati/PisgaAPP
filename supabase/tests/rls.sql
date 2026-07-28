@@ -710,4 +710,338 @@ select assert_denied(
   'you cannot block yourself'
 );
 
+-- -----------------------------------------------------------------------------
+-- Invite links (0006)
+-- -----------------------------------------------------------------------------
+
+do $$
+declare v_token text;
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '33333333-3333-3333-3333-333333333333', true);
+  select token into v_token from my_invite_code();
+  perform set_config('request.jwt.claim.sub', '', true);
+  reset role;
+  perform set_config('pisga.test_token', v_token, false);
+end $$;
+
+select assert(
+  (select count(*) from invite_codes where owner_id = '33333333-3333-3333-3333-333333333333') = 1,
+  'a first call to my_invite_code creates exactly one code'
+);
+
+do $$
+declare v_second text;
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '33333333-3333-3333-3333-333333333333', true);
+  select token into v_second from my_invite_code();
+  reset role;
+  if v_second <> current_setting('pisga.test_token') then
+    raise exception 'FAILED: calling my_invite_code twice returned two different codes';
+  end if;
+  raise notice 'ok: calling my_invite_code again returns the same active code';
+end $$;
+
+-- Bob (no prior history with mallory — alice already has an unrelated pending
+-- row with her from an earlier test) redeems mallory's link and becomes a
+-- friend immediately — no request, no approval step.
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+  perform redeem_invite(current_setting('pisga.test_token'));
+  reset role;
+end $$;
+
+select assert(
+  are_friends('22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333'),
+  'redeeming an invite link makes the two users friends immediately'
+);
+
+-- Idempotent: redeeming the same link again must not error or duplicate the row.
+do $$
+declare v_count int;
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+  perform redeem_invite(current_setting('pisga.test_token'));
+  reset role;
+  select count(*) into v_count from friendships
+  where (user_id = '22222222-2222-2222-2222-222222222222' and friend_id = '33333333-3333-3333-3333-333333333333')
+     or (friend_id = '22222222-2222-2222-2222-222222222222' and user_id = '33333333-3333-3333-3333-333333333333');
+  if v_count <> 1 then
+    raise exception 'FAILED: redeeming the same invite twice created % rows', v_count;
+  end if;
+  raise notice 'ok: redeeming the same invite link twice is a no-op, not a duplicate';
+end $$;
+
+select assert_denied(
+  '33333333-3333-3333-3333-333333333333',
+  $$select redeem_invite(current_setting('pisga.test_token'))$$,
+  'you cannot redeem your own invite link'
+);
+
+-- Regenerating kills the old code — it must stop working immediately.
+do $$
+declare v_old text := current_setting('pisga.test_token');
+declare v_new text;
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '33333333-3333-3333-3333-333333333333', true);
+  select token into v_new from regenerate_invite_code();
+  reset role;
+  if v_new = v_old then
+    raise exception 'FAILED: regenerate_invite_code returned the same token';
+  end if;
+  perform set_config('pisga.test_token', v_new, false);
+end $$;
+
+select assert(
+  (select count(*) from invite_codes
+   where owner_id = '33333333-3333-3333-3333-333333333333' and revoked_at is null) = 1,
+  'regenerating leaves exactly one active code for the owner'
+);
+
+select assert_denied(
+  '22222222-2222-2222-2222-222222222222',
+  $$select redeem_invite((select token from invite_codes
+      where owner_id = '33333333-3333-3333-3333-333333333333' and revoked_at is not null))$$,
+  'a revoked invite link no longer works'
+);
+
+-- invite_preview has to work before sign-in, so it is exercised as anon, not authenticated.
+do $$
+declare v_name text; v_revoked text;
+begin
+  set local role anon;
+  select display_name into v_name from invite_preview(current_setting('pisga.test_token'));
+  reset role;
+  if v_name is distinct from 'Mallory' then
+    raise exception 'FAILED: invite_preview did not return the owner''s name to an anonymous caller';
+  end if;
+  raise notice 'ok: invite_preview shows the inviter''s name to a signed-out visitor';
+
+  select token into v_revoked from invite_codes
+    where owner_id = '33333333-3333-3333-3333-333333333333' and revoked_at is not null;
+  set local role anon;
+  if exists (select 1 from invite_preview(v_revoked)) then
+    reset role;
+    raise exception 'FAILED: invite_preview returned a row for a revoked token';
+  end if;
+  reset role;
+  raise notice 'ok: invite_preview returns nothing for a revoked token';
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- Avatar storage (0006)
+-- -----------------------------------------------------------------------------
+
+select assert_denied(
+  '11111111-1111-1111-1111-111111111111',
+  $$insert into storage.objects (bucket_id, name, owner)
+    values ('avatars', '22222222-2222-2222-2222-222222222222/photo.png', '11111111-1111-1111-1111-111111111111')$$,
+  'a user cannot upload into another user''s avatar folder'
+);
+
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  insert into storage.objects (bucket_id, name, owner)
+  values ('avatars', '11111111-1111-1111-1111-111111111111/photo.png', '11111111-1111-1111-1111-111111111111');
+  reset role;
+end $$;
+
+select assert(
+  (select count(*) from storage.objects where bucket_id = 'avatars') = 1,
+  'a user can upload into their own avatar folder'
+);
+
+-- -----------------------------------------------------------------------------
+-- Group management (0006)
+-- -----------------------------------------------------------------------------
+
+-- By this point alice blocked bob (chat tests) and bob+mallory are friends
+-- (the invite tests above), so bob — not alice — is the one with two
+-- available friends. A 4th fixture user, dave, gives bob someone to add
+-- after the group already exists, exercising add_group_member separately
+-- from group creation.
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('44444444-4444-4444-4444-444444444444', 'dave@example.com', '{"full_name": "Dave"}');
+insert into friendships (user_id, friend_id, status)
+values ('22222222-2222-2222-2222-222222222222',
+        '44444444-4444-4444-4444-444444444444', 'accepted');
+
+do $$
+declare v_group uuid;
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+  select id into v_group from create_group_conversation(
+    'קבוצת בדיקה',
+    array['33333333-3333-3333-3333-333333333333'::uuid]
+  );
+  reset role;
+  perform set_config('pisga.test_group', v_group::text, false);
+end $$;
+
+-- Default: any member can post, not just the owner (bob).
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '33333333-3333-3333-3333-333333333333', true);
+  perform send_message(current_setting('pisga.test_group')::uuid, 'שלום ממלורי');
+  reset role;
+end $$;
+
+select assert(
+  (select count(*) from messages where conversation_id = current_setting('pisga.test_group')::uuid) = 1,
+  'by default any group member can post'
+);
+
+select assert_denied(
+  '33333333-3333-3333-3333-333333333333',
+  $$select set_group_posting_mode(current_setting('pisga.test_group')::uuid, false)$$,
+  'a non-owner cannot switch the group to owner-only'
+);
+
+-- Owner (bob) switches the group to broadcast-only.
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+  perform set_group_posting_mode(current_setting('pisga.test_group')::uuid, false);
+  reset role;
+end $$;
+
+select assert_denied(
+  '33333333-3333-3333-3333-333333333333',
+  $$select send_message(current_setting('pisga.test_group')::uuid, 'עדיין מדבר?')$$,
+  'once switched to owner-only, a member can no longer post'
+);
+
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+  perform send_message(current_setting('pisga.test_group')::uuid, 'הודעה מהמנהל');
+  reset role;
+end $$;
+
+select assert(
+  (select count(*) from messages where conversation_id = current_setting('pisga.test_group')::uuid) = 2,
+  'the owner can still post in owner-only mode'
+);
+
+-- Adding a member.
+select assert_denied(
+  '33333333-3333-3333-3333-333333333333',
+  $$select add_group_member(current_setting('pisga.test_group')::uuid, '44444444-4444-4444-4444-444444444444')$$,
+  'a non-owner cannot add a member'
+);
+
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+  perform add_group_member(current_setting('pisga.test_group')::uuid, '44444444-4444-4444-4444-444444444444');
+  reset role;
+end $$;
+
+select assert(
+  (select count(*) from conversation_members where conversation_id = current_setting('pisga.test_group')::uuid) = 3,
+  'the owner can add a member'
+);
+
+-- Removing a member: owner-only, and never the owner themself.
+select assert_denied(
+  '33333333-3333-3333-3333-333333333333',
+  $$select remove_group_member(current_setting('pisga.test_group')::uuid, '44444444-4444-4444-4444-444444444444')$$,
+  'a non-owner cannot remove a member'
+);
+
+select assert_denied(
+  '22222222-2222-2222-2222-222222222222',
+  $$select remove_group_member(current_setting('pisga.test_group')::uuid, '22222222-2222-2222-2222-222222222222')$$,
+  'the owner cannot remove themself through remove_group_member'
+);
+
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+  perform remove_group_member(current_setting('pisga.test_group')::uuid, '44444444-4444-4444-4444-444444444444');
+  reset role;
+end $$;
+
+select assert(
+  (select count(*) from conversation_members where conversation_id = current_setting('pisga.test_group')::uuid) = 2,
+  'the owner can remove a member'
+);
+
+-- -----------------------------------------------------------------------------
+-- Account deletion (0006)
+-- -----------------------------------------------------------------------------
+
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+  perform request_account_deletion();
+  reset role;
+end $$;
+
+select assert(
+  (select count(*) from account_deletion_requests where user_id = '22222222-2222-2222-2222-222222222222') = 1,
+  'requesting account deletion records the request'
+);
+
+select assert(
+  (select count(*) from user_goals where user_id = '22222222-2222-2222-2222-222222222222') = 0,
+  'requesting account deletion wipes the user''s own goals'
+);
+
+select assert(
+  (select count(*) from friendships
+   where user_id = '22222222-2222-2222-2222-222222222222' or friend_id = '22222222-2222-2222-2222-222222222222') = 0,
+  'requesting account deletion removes the user''s friendships'
+);
+
+-- -----------------------------------------------------------------------------
+-- Unarchive (0006)
+-- -----------------------------------------------------------------------------
+
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  update user_goals set active = false where id = 'aaaa0002-0000-0000-0000-000000000002';
+  reset role;
+end $$;
+
+select assert(
+  not (select active from user_goals where id = 'aaaa0002-0000-0000-0000-000000000002'),
+  'archiving a goal marks it inactive'
+);
+
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  perform unarchive_goal('aaaa0002-0000-0000-0000-000000000002');
+  reset role;
+end $$;
+
+select assert(
+  (select active from user_goals where id = 'aaaa0002-0000-0000-0000-000000000002'),
+  'unarchiving a goal reactivates it'
+);
+
+select assert_denied(
+  '22222222-2222-2222-2222-222222222222',
+  $$select unarchive_goal('aaaa0001-0000-0000-0000-000000000001')$$,
+  'a user cannot unarchive someone else''s goal'
+);
+
 \echo 'all RLS tests passed'

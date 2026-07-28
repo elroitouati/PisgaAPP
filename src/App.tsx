@@ -21,6 +21,13 @@ import Friends from '@/pages/Friends'
 import Chat from '@/pages/Chat'
 import SharedGoal from '@/pages/SharedGoal'
 import Profile from '@/pages/Profile'
+import EditProfile from '@/pages/EditProfile'
+import PrivacyData from '@/pages/PrivacyData'
+import DeleteAccount from '@/pages/DeleteAccount'
+import MyGoals from '@/pages/MyGoals'
+import NotificationsScreen from '@/pages/NotificationsScreen'
+import InviteFriend from '@/pages/InviteFriend'
+import JoinInvite from '@/pages/JoinInvite'
 import NotFound from '@/pages/NotFound'
 import SetupRequired from '@/pages/SetupRequired'
 
@@ -45,6 +52,9 @@ export default function App() {
                 <Routes>
                   <Route path="/login" element={<Login />} />
                   <Route path="/auth/callback" element={<AuthCallback />} />
+                  {/* Has to render signed out too — a new visitor previews the
+                      inviter before any auth happens. */}
+                  <Route path="/join/:token" element={<JoinInvite />} />
 
                   <Route element={<ProtectedRoute />}>
                     <Route element={<OnboardingGate />}>
@@ -54,6 +64,12 @@ export default function App() {
                       {/* Full height, own composer — outside the shell. */}
                       <Route path="/chat/:conversationId" element={<Chat />} />
                       <Route path="/shared-goal" element={<SharedGoal />} />
+                      <Route path="/profile/edit" element={<EditProfile />} />
+                      <Route path="/profile/privacy" element={<PrivacyData />} />
+                      <Route path="/profile/delete" element={<DeleteAccount />} />
+                      <Route path="/profile/goals" element={<MyGoals />} />
+                      <Route path="/profile/notifications" element={<NotificationsScreen />} />
+                      <Route path="/profile/invite" element={<InviteFriend />} />
 
                       <Route element={<AppShell />}>
                         <Route path="/" element={<Home />} />
