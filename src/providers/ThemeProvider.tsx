@@ -46,9 +46,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
-    document
-      .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', theme === 'dark' ? '#2b2f38' : '#ffffff')
+    // Match the page background exactly, or the OS draws a mismatched band
+    // above the app. The markup ships one meta per colour scheme, so both are
+    // collapsed to the resolved theme here.
+    const resolved = theme === 'dark' ? '#0d0e10' : '#fbfbfa'
+    for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
+      meta.removeAttribute('media')
+      meta.setAttribute('content', resolved)
+    }
   }, [theme])
 
   const setPreference = useCallback((next: ThemePreference) => {

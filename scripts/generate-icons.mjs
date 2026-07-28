@@ -1,9 +1,8 @@
 /**
  * Regenerates the PWA icon set from a single inline SVG source.
  *
- * These are PLACEHOLDER icons built from the placeholder summit mark. When the
- * real logo arrives with the design handoff, swap `glyph`/`BRAND` below and
- * re-run: `node scripts/generate-icons.mjs`.
+ * Built from the summit glyph the handoff puts beside the PISGA wordmark.
+ * Re-run after changing the palette: `node scripts/generate-icons.mjs`.
  */
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -13,8 +12,11 @@ import sharp from 'sharp'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const iconsDir = path.join(root, 'public', 'icons')
 
-const BRAND = '#3b5bdb'
-const ON_BRAND = '#ffffff'
+// The real palette from the handoff, not a brand hue: Pisga is monochrome
+// (PRD 7). The icon uses the dark background with the light foreground, which
+// reads on both a light and a dark home screen.
+const BRAND = '#0d0e10'
+const ON_BRAND = '#fbfbfa'
 
 /** Summit glyph on a 48x48 grid, matching src/components/Brand.tsx. */
 const glyph = (stroke, fill) => `
