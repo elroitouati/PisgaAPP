@@ -1,30 +1,16 @@
 import type { TrackedGoal } from '@/types/db'
-import type { VerificationMethod } from '@/types/db'
 
 /**
- * ⚠ PROVISIONAL — the points formula is NOT specified anywhere in the PRD.
- * The design shows totals ("1,240 נקודות") and a per-goal award ("+40 נק'"),
- * which tells us points exist and vary by goal, but not how they are earned.
+ * Points come from the goal itself — each library goal carries its own value
+ * (see supabase/migrations/0004_goal_points.sql), rather than being derived
+ * from its category or verification method.
  *
- * The weights below are a placeholder so the screens have real numbers to
- * render, scaled by how much a verification method actually demands. Replace
- * this table once the rule is decided — it is the only place points are
- * computed, so nothing else has to change.
- *
- * PRD 3.1 is settled and enforced here: only structured (library) goals score.
- * Custom goals are excluded because there is no objective way to compare their
- * difficulty.
+ * PRD 3.1: only structured (library) goals score. The database already forces
+ * `points` to 0 on a custom goal, so this is a display-side echo of a rule
+ * that is enforced where it cannot be bypassed.
  */
-const POINTS_BY_VERIFICATION: Record<VerificationMethod, number> = {
-  guided_session: 40,
-  sensor_sync: 30,
-  daily_checkin: 20,
-  checkbox_reflection: 20,
-}
-
-export function pointsFor(goal: Pick<TrackedGoal, 'is_custom' | 'verification'>): number {
-  if (goal.is_custom) return 0
-  return POINTS_BY_VERIFICATION[goal.verification]
+export function pointsFor(goal: Pick<TrackedGoal, 'is_custom' | 'points'>): number {
+  return goal.is_custom ? 0 : goal.points
 }
 
 export function pointsEarnedToday(goals: TrackedGoal[]): number {

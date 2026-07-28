@@ -21,6 +21,7 @@ npm run dev
    - `supabase/migrations/0001_initial_schema.sql` — טבלאות, enums, RLS, פונקציות
    - `supabase/migrations/0002_seed_goals_library.sql` — תוכן ספריית המטרות
    - `supabase/migrations/0003_badges.sql` — באדג׳ים ולוגיקת ההענקה
+   - `supabase/migrations/0004_goal_points.sql` — ערכי נקודות וחישוב הניקוד
 3. ב‑Authentication → Providers: הפעילו Email והפעילו Google (עם ה‑Client ID/Secret מ‑Google Cloud).
 4. ב‑Authentication → URL Configuration: הוסיפו את `http://localhost:5173/auth/callback`
    ואת כתובת הפרודקשן ל‑Redirect URLs.
@@ -29,7 +30,7 @@ npm run dev
 
 ```bash
 npm run build                  # typecheck + build
-./scripts/verify-sql.sh        # מיגרציות + 41 בדיקות RLS ובאדג׳ים על Postgres זמני
+./scripts/verify-sql.sh        # מיגרציות + 50 בדיקות RLS, באדג׳ים ונקודות על Postgres זמני
 ```
 
 `verify-sql.sh` דורש Postgres מקומי; העבירו לו `PGHOST`/`PGPORT`/`PGUSER`.
@@ -42,7 +43,8 @@ npm run build                  # typecheck + build
 src/
   i18n/          מילון he/en + ספק שפה (מחליף גם את כיוון הדף)
   providers/     Auth, Profile, Theme
-  hooks/         useGoals (מעקב יומי), useGuidedSession (טיימר), useBadges, useAsync
+  hooks/         useGoals (מעקב יומי), useGuidedSession (טיימר), useBadges,
+                 usePoints, useAsync
   lib/           supabase, api (שאילתות), categories, scoring, dates, quotes
   components/    ui, icons, GoalRow, BottomNav, AppShell
   pages/         Login, Onboarding, Home, CategoryScreen, GuidedSession,
@@ -79,8 +81,9 @@ scripts/
 
 מסומן בקוד ב‑`⚠ PROVISIONAL` ומרוכז כאן:
 
-- **נוסחת הנקודות** — לא מוגדרת ב‑PRD. `src/lib/scoring.ts` מחזיק טבלת משקלים זמנית
-  לפי שיטת האימות. מה שכן סגור ומיושם: רק מטרות מובנות צוברות נקודות (PRD 3.1).
+- **ערכי הנקודות** — המנגנון סגור (ערך נפרד לכל מטרה, ב‑`goals_library.points`),
+  אבל המספרים עצמם הם הצעה שנעגנה ב‑"+40" שמופיע בעיצוב. לשינוי — `0004_goal_points.sql`.
 - **תוכן ספריית המטרות** — 21 מטרות כהצעה ראשונה (PRD 13).
-- **מקור הציטוט היומי** — רשימה קבועה ב‑`src/lib/quotes.ts`, ללא ייחוס לשמות (PRD 13).
+- **שלושה ייחוסי ציטוט שנויים במחלוקת** — מסומנים `disputed` ב‑`src/lib/quotes.ts`
+  (אריסטו/ויל דוראנט, לינקולן, ושם המחבר של הציטוט הראשון).
 - **סנכרון צעדים** — מטרות `sensor_sync` מציגות שהחיבור אינו קיים במקום לקבל דיווח עצמי.

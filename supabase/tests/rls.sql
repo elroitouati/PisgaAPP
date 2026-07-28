@@ -471,4 +471,73 @@ begin
   raise notice 'ok: re-evaluating badges awards nothing twice';
 end $$;
 
+-- -----------------------------------------------------------------------------
+-- Points (0004)
+-- -----------------------------------------------------------------------------
+
+select assert(
+  (select points from user_goals where id = 'aaaa0001-0000-0000-0000-000000000001')
+    = (select points from goals_library where slug = 'pushups-60'),
+  'adopting a library goal copies its points across'
+);
+
+select assert(
+  (select count(*) from user_goals where is_custom and points <> 0) = 0,
+  'a custom goal is always worth zero (PRD 3.1)'
+);
+
+-- The trigger overwrites whatever the client sent, so a forged score cannot land.
+insert into user_goals (id, user_id, library_id, is_custom, title, category, goal_type, verification, points)
+select 'aaaa0006-0000-0000-0000-000000000006', '22222222-2222-2222-2222-222222222222',
+       id, false, title_he, category, goal_type, verification, 9999
+from goals_library where slug = 'water-8-cups';
+
+select assert(
+  (select points from user_goals where id = 'aaaa0006-0000-0000-0000-000000000006')
+    = (select points from goals_library where slug = 'water-8-cups'),
+  'a client-supplied points value is overwritten by the library price'
+);
+
+do $$
+begin
+  begin
+    insert into user_goals (user_id, is_custom, title, category, goal_type, verification, points)
+    values ('22222222-2222-2222-2222-222222222222', true, 'forged', 'personal', 'daily', 'daily_checkin', 500);
+    -- The trigger zeroes it before the constraint sees it, so this must land at 0.
+  exception when check_violation then
+    raise exception 'FAILED: a custom goal with points was rejected instead of zeroed';
+  end;
+  if (select points from user_goals where title = 'forged') <> 0 then
+    raise exception 'FAILED: a custom goal kept a non-zero score';
+  end if;
+  raise notice 'ok: a custom goal submitted with points is forced to zero';
+end $$;
+
+-- Bob completes his one daily goal twice: score = 2 x the goal's value.
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+  perform record_goal_completion('aaaa0006-0000-0000-0000-000000000006', 'שתיתי', current_date - 1);
+  perform record_goal_completion('aaaa0006-0000-0000-0000-000000000006', 'שתיתי', current_date);
+  reset role;
+end $$;
+
+select assert(
+  total_points('22222222-2222-2222-2222-222222222222')
+    = 2 * (select points from goals_library where slug = 'water-8-cups'),
+  'a daily goal scores once per completion'
+);
+
+select assert(
+  points_this_month('22222222-2222-2222-2222-222222222222', 'academic') = 0,
+  'scoping points to a category the user has nothing in returns zero'
+);
+
+-- An unfinished long-term goal scores nothing; finishing it scores once.
+select assert(
+  (select points from user_goals where id = 'aaaa0005-0000-0000-0000-000000000005') = 0,
+  'a custom long-term goal is still worth zero'
+);
+
 \echo 'all RLS tests passed'

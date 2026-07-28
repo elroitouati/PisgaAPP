@@ -2,7 +2,7 @@ import { Link, Navigate, useParams } from 'react-router-dom'
 import { useI18n } from '@/i18n/useI18n'
 import { useTrackedGoals } from '@/hooks/useGoals'
 import { CATEGORIES, CATEGORY_META, categoryStyle, type Category } from '@/lib/categories'
-import { pointsEarnedToday } from '@/lib/scoring'
+import { useMonthlyPoints } from '@/hooks/usePoints'
 import { BackIcon, SummitIcon } from '@/components/icons'
 import { Card, CategoryTile, EmptyState, ErrorState, SectionLabel } from '@/components/ui'
 import { GoalRow } from '@/components/GoalRow'
@@ -17,6 +17,9 @@ export default function CategoryScreen() {
   const { category } = useParams<{ category: string }>()
   const { t } = useI18n()
   const { goals, loading, error, reload, complete, undo } = useTrackedGoals()
+  const { points: monthlyPoints } = useMonthlyPoints(
+    CATEGORIES.includes(category as Category) ? (category as Category) : undefined,
+  )
 
   if (!CATEGORIES.includes(category as Category)) return <Navigate to="/404" replace />
   const key = category as Category
@@ -64,7 +67,7 @@ export default function CategoryScreen() {
             <b className="text-fg font-semibold">{categoryStreak}</b> {t('cat.streakInCategory')}
           </span>
           <span>
-            <b className="text-fg font-semibold">{pointsEarnedToday(inCategory)}</b>{' '}
+            <b className="text-fg font-semibold">{monthlyPoints}</b>{' '}
             {t('cat.pointsThisMonth')}
           </span>
         </div>

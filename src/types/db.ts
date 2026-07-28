@@ -51,6 +51,8 @@ export type LibraryGoal = {
   verification: VerificationMethod
   suggested_frequency: string | null
   session_config: SessionConfig
+  /** What one completion of this goal is worth (PRD 6.7). */
+  points: number
   sort_order: number
 }
 
@@ -67,6 +69,10 @@ export type UserGoal = {
   verification: VerificationMethod
   session_config: SessionConfig
   target_date: string | null
+  /** Copied from the library at adoption; always 0 for a custom goal. */
+  points: number
+  /** Set when a deadline or long-term goal is finished. */
+  completed_at: string | null
   active: boolean
   added_at: string
 }

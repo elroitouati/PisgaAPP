@@ -4,7 +4,8 @@ import { useProfile } from '@/providers/useProfile'
 import { useTrackedGoals, type CategorySummary } from '@/hooks/useGoals'
 import { useBadges } from '@/hooks/useBadges'
 import { CATEGORY_META } from '@/lib/categories'
-import { overallStreak, pointsEarnedToday } from '@/lib/scoring'
+import { overallStreak } from '@/lib/scoring'
+import { useTotalPoints } from '@/hooks/usePoints'
 import { BellIcon, SummitIcon } from '@/components/icons'
 import {
   CategoryTile,
@@ -15,7 +16,7 @@ import {
   StatStrip,
 } from '@/components/ui'
 import { Spinner } from '@/components/Spinner'
-import { DAILY_QUOTES } from '@/lib/quotes'
+import { quoteOfTheDay } from '@/lib/quotes'
 
 /** Design 5a. */
 export default function Home() {
@@ -23,6 +24,7 @@ export default function Home() {
   const { profile } = useProfile()
   const { goals, byCategory, pending, loading, error, reload } = useTrackedGoals()
   const { earned } = useBadges()
+  const { points } = useTotalPoints()
 
   const firstName = profile?.display_name?.split(' ')[0] ?? ''
   const today = new Date()
@@ -60,7 +62,7 @@ export default function Home() {
           stats={[
             { value: String(overallStreak(goals)), label: t('home.stat.streak') },
             {
-              value: pointsEarnedToday(goals).toLocaleString(lang === 'he' ? 'he-IL' : 'en-US'),
+              value: points.toLocaleString(lang === 'he' ? 'he-IL' : 'en-US'),
               label: t('home.stat.points'),
             },
             { value: String(earned.length), label: t('home.stat.badges') },
@@ -88,11 +90,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* The accent rule sits on the reading-start edge — right in Hebrew,
-          left once the app is switched to English. */}
-      <blockquote className="border-line bg-surface text-fg-muted mt-auto rounded-xl border border-s-2 border-s-[var(--color-fg-subtle)] px-[15px] py-[13px] text-[13.5px] leading-relaxed">
-        {quoteOfTheDay(lang)}
-      </blockquote>
+      <DailyQuote lang={lang} />
     </>
   )
 }
@@ -136,9 +134,16 @@ function weekday(date: Date, lang: string) {
   return new Intl.DateTimeFormat(lang === 'he' ? 'he-IL' : 'en-US', { weekday: 'long' }).format(date)
 }
 
-/** Rotates through the list by day so everyone sees the same quote each day. */
-function quoteOfTheDay(lang: 'he' | 'en') {
-  const dayIndex = Math.floor(Date.now() / 86_400_000)
-  const quote = DAILY_QUOTES[dayIndex % DAILY_QUOTES.length]
-  return lang === 'he' ? quote.he : quote.en
+function DailyQuote({ lang }: { lang: 'he' | 'en' }) {
+  const quote = quoteOfTheDay()
+  return (
+    // The accent rule sits on the reading-start edge — right in Hebrew, left
+    // once the app is switched to English.
+    <blockquote className="border-line bg-surface text-fg-muted mt-auto rounded-xl border border-s-2 border-s-[var(--color-fg-subtle)] px-[15px] py-[13px] text-[13.5px] leading-relaxed">
+      {lang === 'he' ? quote.he : quote.en}
+      <footer className="text-fg-subtle mt-1.5 text-[12px]">
+        {lang === 'he' ? quote.authorHe : quote.authorEn}
+      </footer>
+    </blockquote>
+  )
 }

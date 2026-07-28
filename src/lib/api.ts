@@ -72,7 +72,11 @@ export async function fetchLibrary(): Promise<LibraryGoal[]> {
   )
 }
 
-/** Copies a library goal into the user's own list (PRD 3.1: not custom). */
+/**
+ * Copies a library goal into the user's own list (PRD 3.1: not custom).
+ * `points` is deliberately not sent — a database trigger copies it from the
+ * library so a client cannot name its own score.
+ */
 export async function adoptLibraryGoal(userId: string, goal: LibraryGoal): Promise<UserGoal> {
   return unwrap(
     await supabase
@@ -226,4 +230,21 @@ export async function fetchBadges(userId: string): Promise<EarnedBadge[]> {
 export async function finishGoal(userGoalId: string): Promise<void> {
   const { error } = await supabase.rpc('finish_goal', { p_user_goal_id: userGoalId })
   if (error) throw new Error(error.message)
+}
+
+/** Lifetime score, summed in the database (see total_points). */
+export async function fetchTotalPoints(userId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('total_points', { p_user_id: userId })
+  if (error) throw new Error(error.message)
+  return (data as number) ?? 0
+}
+
+/** Points earned this calendar month, optionally scoped to one category. */
+export async function fetchMonthlyPoints(userId: string, category?: Category): Promise<number> {
+  const { data, error } = await supabase.rpc('points_this_month', {
+    p_user_id: userId,
+    p_category: category ?? null,
+  })
+  if (error) throw new Error(error.message)
+  return (data as number) ?? 0
 }
