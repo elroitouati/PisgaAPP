@@ -188,9 +188,9 @@ function SessionRunner({
                 session.endSet()
               }
             }}
-            className="flex h-14 flex-1 items-center justify-center gap-2 rounded-[28px] bg-[var(--cat)] text-base font-bold text-white disabled:opacity-60"
+            className="flex h-14 flex-1 items-center justify-center gap-2 rounded-[28px] bg-[var(--cat)] text-base font-bold text-on-cat disabled:opacity-60"
           >
-            {saving ? <Spinner className="border-white/30 border-t-white" /> : null}
+            {saving ? <Spinner className="border-on-cat/30 border-t-on-cat" /> : null}
             {isDone
               ? t('timer.finish')
               : session.phase === 'rest'

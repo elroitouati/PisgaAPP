@@ -76,7 +76,7 @@ export function GoalRow({ goal, onComplete, onUndo }: Props) {
           aria-label={goal.completedToday ? t('verify.completed') : t('verify.done')}
           className={`flex size-6 flex-none items-center justify-center rounded-full ${
             goal.completedToday
-              ? 'bg-[var(--cat)] text-white'
+              ? 'bg-[var(--cat)] text-on-cat'
               : 'border-[1.6px] border-[var(--cat)] text-[var(--cat)]'
           }`}
         >
@@ -122,7 +122,7 @@ export function GoalRow({ goal, onComplete, onUndo }: Props) {
             type="button"
             disabled={busy || note.trim() === ''}
             onClick={() => void run(() => onComplete(goal.id, note))}
-            className="self-end rounded-full bg-[var(--cat)] px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+            className="self-end rounded-full bg-[var(--cat)] px-4 py-1.5 text-xs font-semibold text-on-cat disabled:opacity-50"
           >
             {t('verify.done')}
           </button>

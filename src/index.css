@@ -63,6 +63,11 @@
   --color-brand: var(--pisga-tprim);
   --color-on-brand: var(--pisga-bg);
 
+  /* Text/icons sitting on a category-coloured fill. The handoff uses #fff in
+     light and the page background in dark: dark-mode category colours are
+     light (oklch ~0.75), so white on them would be barely legible. */
+  --color-on-cat: var(--pisga-bg);
+
   --color-cat-physical: var(--pisga-phys);
   --color-cat-academic: var(--pisga-study);
   --color-cat-social: var(--pisga-social);
@@ -91,7 +96,9 @@
   --pisga-social: oklch(0.56 0.075 335);
   --pisga-pers: oklch(0.62 0.085 55);
 
-  /* Category tint behind an icon tile — mixed toward the page, per the handoff. */
+  /* Base a category tint is mixed toward. Light mixes toward white; dark mixes
+     toward the card surface, not black — mixing toward black in dark mode
+     darkens the tile well past what the handoff draws. */
   --pisga-tint-base: #fff;
   color-scheme: light;
 }
@@ -110,7 +117,7 @@
   --pisga-social: oklch(0.72 0.055 335);
   --pisga-pers: oklch(0.75 0.055 55);
 
-  --pisga-tint-base: #000;
+  --pisga-tint-base: var(--pisga-card);
   color-scheme: dark;
 }
 

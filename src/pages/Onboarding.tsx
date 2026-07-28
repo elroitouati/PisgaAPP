@@ -257,7 +257,7 @@ function CategoryChoice({
       <div
         className="flex size-10 flex-none items-center justify-center rounded-xl text-[var(--cat)]"
         style={{
-          background: `color-mix(in oklch, var(--cat) ${selected ? 18 : 15}%, var(--pisga-card))`,
+          background: `color-mix(in oklch, var(--cat) ${selected ? 18 : 15}%, var(--pisga-tint-base))`,
         }}
       >
         <Icon size={22} />

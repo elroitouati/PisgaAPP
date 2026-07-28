@@ -119,7 +119,7 @@ export default function Library() {
                   style={categoryStyle(goal.category)}
                   className={`flex size-7 flex-none items-center justify-center rounded-full ${
                     added
-                      ? 'bg-[var(--cat)] text-white'
+                      ? 'bg-[var(--cat)] text-on-cat'
                       : 'border-line text-fg-muted border disabled:opacity-50'
                   }`}
                 >
