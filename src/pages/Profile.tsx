@@ -4,12 +4,17 @@ import { useProfile } from '@/providers/useProfile'
 import { LanguageToggle, ThemeToggle } from '@/components/SettingsToggles'
 import { Card, SectionLabel } from '@/components/ui'
 import { SummitIcon } from '@/components/icons'
+import { useState } from 'react'
+import { setPresenceSharing } from '@/hooks/usePresence'
 
 /** Design 3d, trimmed to the settings PRD 10 lists for the MVP. */
 export default function Profile() {
   const { t } = useI18n()
   const { user, signOut } = useAuth()
   const { profile } = useProfile()
+  const [sharesPresence, setSharesPresence] = useState(
+    () => localStorage.getItem('pisga.presence') !== 'off',
+  )
 
   return (
     <>
@@ -48,6 +53,36 @@ export default function Profile() {
         <SectionLabel>{t('common.theme')}</SectionLabel>
       </div>
       <ThemeToggle />
+
+      {/* Presence tells friends when you have the app open, so it is opt-out
+          rather than always-on. */}
+      <div className="mt-6 mb-2.5">
+        <SectionLabel>{t('chat.presence')}</SectionLabel>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={sharesPresence}
+        onClick={() => {
+          const next = !sharesPresence
+          setSharesPresence(next)
+          setPresenceSharing(next)
+        }}
+        className="border-line bg-surface flex items-center justify-between rounded-[16px] border px-[17px] py-4 text-start"
+      >
+        <span className="text-fg-muted text-xs">{t('chat.presenceSub')}</span>
+        <span
+          className={`relative h-[27px] w-[46px] flex-none rounded-full transition-colors ${
+            sharesPresence ? 'bg-fg' : 'bg-line'
+          }`}
+        >
+          <span
+            className={`absolute top-[3px] size-[21px] rounded-full transition-all ${
+              sharesPresence ? 'bg-bg end-[3px]' : 'bg-fg-muted start-[3px]'
+            }`}
+          />
+        </span>
+      </button>
 
       <button
         type="button"

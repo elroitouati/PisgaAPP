@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useI18n } from '@/i18n/useI18n'
 import { useAuth } from '@/providers/useAuth'
 import { useProfile } from '@/providers/useProfile'
@@ -9,6 +10,10 @@ import { CATEGORIES, categoryStyle, type Category } from '@/lib/categories'
 import { AddFriendIcon, SummitIcon } from '@/components/icons'
 import { Card, EmptyState, ErrorState, SectionLabel } from '@/components/ui'
 import { Spinner } from '@/components/Spinner'
+import { useConversations } from '@/hooks/useConversations'
+import { usePresence } from '@/hooks/usePresence'
+import { openDirectConversation } from '@/lib/chat'
+import { ChatIcon } from '@/components/icons'
 
 /**
  * Designs 5e (light) and 2e (dark) — one screen, both palettes.
@@ -22,6 +27,22 @@ export default function Friends() {
   const { user } = useAuth()
   const { profile } = useProfile()
   const { goals } = useTrackedGoals()
+  const { conversations } = useConversations()
+  const { isOnline } = usePresence()
+  const navigate = useNavigate()
+  const [opening, setOpening] = useState<string | null>(null)
+
+  // Tapping a friend opens (or reuses) the 1:1 thread — find-or-create lives in
+  // the database, so two taps cannot produce two threads.
+  async function openChat(friendId: string) {
+    setOpening(friendId)
+    try {
+      const conversation = await openDirectConversation(friendId)
+      navigate(`/chat/${conversation.id}`)
+    } finally {
+      setOpening(null)
+    }
+  }
 
   const { data, loading, error, reload } = useAsync<FriendProgress[]>(
     () => (user ? fetchFriends(user.id) : Promise.resolve([])),
@@ -114,7 +135,13 @@ export default function Friends() {
               </div>
               <div className="flex flex-col gap-2.5">
                 {active.map((friend) => (
-                  <FriendRow key={friend.id} friend={friend} />
+                  <FriendRow
+                    key={friend.id}
+                    friend={friend}
+                    online={isOnline(friend.id)}
+                    opening={opening === friend.id}
+                    onOpenChat={() => void openChat(friend.id)}
+                  />
                 ))}
               </div>
             </>
@@ -127,18 +154,99 @@ export default function Friends() {
               </div>
               <div className="flex flex-col gap-2.5">
                 {idle.map((friend) => (
-                  <FriendRow key={friend.id} friend={friend} idle />
+                  <FriendRow
+                    key={friend.id}
+                    friend={friend}
+                    idle
+                    online={isOnline(friend.id)}
+                    opening={opening === friend.id}
+                    onOpenChat={() => void openChat(friend.id)}
+                  />
                 ))}
               </div>
             </>
           ) : null}
         </>
       )}
+
+      {conversations.length > 0 ? (
+        <>
+          <div className="mt-6 mb-2.5">
+            <SectionLabel>{t('friends.conversations')}</SectionLabel>
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {conversations.map((conversation) => (
+              <button
+                key={conversation.id}
+                type="button"
+                onClick={() => navigate(`/chat/${conversation.id}`)}
+                className="border-line bg-surface flex items-center gap-[13px] rounded-[16px] border px-[15px] py-[13px] text-start"
+              >
+                <span className="relative flex-none">
+                  <Avatar
+                    name={conversation.title}
+                    accent={CATEGORIES[hashToIndex(conversation.id, CATEGORIES.length)]}
+                  />
+                  {conversation.otherUserId && isOnline(conversation.otherUserId) ? (
+                    <span
+                      aria-label={t('chat.online')}
+                      style={categoryStyle('physical')}
+                      className="border-bg absolute bottom-0 start-0 size-2.5 rounded-full border-2 bg-[var(--cat)]"
+                    />
+                  ) : null}
+                </span>
+
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="truncate text-[15px] font-semibold">{conversation.title}</span>
+                    <span className="text-fg-subtle flex-none text-[11px]">
+                      {conversation.lastAt ? shortTime(conversation.lastAt) : ''}
+                    </span>
+                  </span>
+                  <span className="text-fg-muted mt-0.5 block truncate text-xs">
+                    {conversation.lastSenderName ? `${conversation.lastSenderName}: ` : ''}
+                    {conversation.lastMessage ?? t('chat.deleted')}
+                  </span>
+                </span>
+
+                {conversation.unread > 0 ? (
+                  <span
+                    style={categoryStyle('physical')}
+                    className="text-on-cat flex size-5 flex-none items-center justify-center rounded-full bg-[var(--cat)] text-[11px] font-bold"
+                  >
+                    {conversation.unread}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
     </>
   )
 }
 
-function FriendRow({ friend, idle = false }: { friend: FriendProgress; idle?: boolean }) {
+/** Same-day messages show a time, older ones a date — as in design 4c. */
+function shortTime(iso: string) {
+  const at = new Date(iso)
+  const sameDay = at.toDateString() === new Date().toDateString()
+  return new Intl.DateTimeFormat(undefined, sameDay ? { timeStyle: 'short' } : { dateStyle: 'short' })
+    .format(at)
+}
+
+function FriendRow({
+  friend,
+  idle = false,
+  online = false,
+  opening = false,
+  onOpenChat,
+}: {
+  friend: FriendProgress
+  idle?: boolean
+  online?: boolean
+  opening?: boolean
+  onOpenChat?: () => void
+}) {
   const { t } = useI18n()
   // A stable accent per person so their avatar colour does not change between
   // renders or screens.
@@ -146,7 +254,16 @@ function FriendRow({ friend, idle = false }: { friend: FriendProgress; idle?: bo
 
   return (
     <Card className={`flex items-center gap-[13px] px-[15px] py-[13px] ${idle ? 'opacity-65' : ''}`}>
-      <Avatar name={friend.displayName} url={friend.avatarUrl} accent={idle ? null : accent} />
+      <span className="relative flex-none">
+        <Avatar name={friend.displayName} url={friend.avatarUrl} accent={idle ? null : accent} />
+        {online ? (
+          <span
+            aria-label={t('chat.online')}
+            style={categoryStyle('physical')}
+            className="border-bg absolute bottom-0 start-0 size-2.5 rounded-full border-2 bg-[var(--cat)]"
+          />
+        ) : null}
+      </span>
 
       <div className="min-w-0 flex-1">
         <div className="text-[15px] font-semibold">{friend.displayName}</div>
@@ -176,6 +293,20 @@ function FriendRow({ friend, idle = false }: { friend: FriendProgress; idle?: bo
           {t('friends.streak')}
         </div>
       </div>
+
+      <button
+        type="button"
+        onClick={onOpenChat}
+        disabled={opening}
+        aria-label={t('friends.conversations')}
+        className="border-line text-fg-muted flex size-8 flex-none items-center justify-center rounded-full border"
+      >
+        {opening ? (
+          <Spinner className="size-3.5 border-current/30 border-t-current" />
+        ) : (
+          <ChatIcon size={16} />
+        )}
+      </button>
     </Card>
   )
 }

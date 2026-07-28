@@ -540,4 +540,174 @@ select assert(
   'a custom long-term goal is still worth zero'
 );
 
+-- -----------------------------------------------------------------------------
+-- Chat (0005)
+-- -----------------------------------------------------------------------------
+
+-- Alice opens a thread with bob (a friend); mallory is not a friend.
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  perform open_direct_conversation('22222222-2222-2222-2222-222222222222');
+  reset role;
+end $$;
+
+select assert(
+  (select count(*) from conversations where kind = 'direct') = 1,
+  'opening a direct conversation creates one thread'
+);
+select assert(
+  (select count(*) from conversation_members) = 2,
+  'both participants are added to a direct thread'
+);
+
+-- Find-or-create: a second call must reuse the thread, not open another.
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+  perform open_direct_conversation('11111111-1111-1111-1111-111111111111');
+  reset role;
+end $$;
+
+select assert(
+  (select count(*) from conversations where kind = 'direct') = 1,
+  'the same pair never gets a second thread, from either side'
+);
+
+select assert_denied(
+  '11111111-1111-1111-1111-111111111111',
+  $$select open_direct_conversation('33333333-3333-3333-3333-333333333333')$$,
+  'you cannot open a thread with someone who is not a friend'
+);
+
+-- Messaging
+do $$
+declare v_conv uuid;
+begin
+  select id into v_conv from conversations where kind = 'direct';
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  perform send_message(v_conv, 'בוקר טוב!');
+  reset role;
+end $$;
+
+select assert(
+  (select body from messages) = 'בוקר טוב!',
+  'a member can post a message'
+);
+
+select assert_denied(
+  '33333333-3333-3333-3333-333333333333',
+  $$select send_message((select id from conversations where kind = 'direct'), 'עוקף')$$,
+  'a non-member cannot post into a conversation'
+);
+
+set role authenticated;
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+create temp table mallory_msgs as select count(*) as n from messages;
+reset role; reset request.jwt.claim.sub;
+
+select assert((select n from mallory_msgs) = 0, 'a non-member cannot read the messages either');
+
+-- Editing and deleting are the sender's alone.
+select assert_denied(
+  '22222222-2222-2222-2222-222222222222',
+  $$select edit_message((select id from messages limit 1), 'נערך בידי מישהו אחר')$$,
+  'a member cannot edit someone else''s message'
+);
+select assert_denied(
+  '22222222-2222-2222-2222-222222222222',
+  $$select delete_message((select id from messages limit 1))$$,
+  'a member cannot delete someone else''s message'
+);
+
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  perform edit_message((select id from messages limit 1), 'בוקר אור!');
+  reset role;
+end $$;
+
+select assert(
+  (select body from messages) = 'בוקר אור!' and (select edited_at from messages) is not null,
+  'the sender can edit their own message and it is marked edited'
+);
+
+-- Sharing a goal: only your own, and only a personal one.
+select assert_denied(
+  '11111111-1111-1111-1111-111111111111',
+  $$select send_message((select id from conversations where kind='direct'), null,
+      'aaaa0001-0000-0000-0000-000000000001')$$,
+  'a library goal cannot be shared into a chat'
+);
+
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  perform send_message((select id from conversations where kind='direct'), null,
+                       'aaaa0002-0000-0000-0000-000000000002');
+  reset role;
+end $$;
+
+select assert(
+  (select count(*) from messages where shared_goal_id is not null) = 1,
+  'a personal goal can be shared into a chat'
+);
+
+-- Deleting clears the text rather than only flagging it.
+do $$
+declare v_id uuid;
+begin
+  select id into v_id from messages where body = 'בוקר אור!';
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  perform delete_message(v_id);
+  reset role;
+  if (select body from messages where id = v_id) is not null then
+    raise exception 'FAILED: a deleted message kept its text';
+  end if;
+  raise notice 'ok: deleting a message clears its body, not just a flag';
+end $$;
+
+-- Blocking cuts the chat and the progress visibility together.
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  perform block_user('22222222-2222-2222-2222-222222222222');
+  reset role;
+end $$;
+
+select assert(
+  not are_friends('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222'),
+  'blocking ends the friendship'
+);
+
+set role authenticated;
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+create temp table bob_after_block as
+  select count(*) as goals from user_goals where user_id = '11111111-1111-1111-1111-111111111111';
+reset role; reset request.jwt.claim.sub;
+
+select assert(
+  (select goals from bob_after_block) = 0,
+  'a blocked user can no longer see your goals'
+);
+
+select assert_denied(
+  '22222222-2222-2222-2222-222222222222',
+  $$select send_message((select id from conversations where kind='direct'), 'עדיין כאן?')$$,
+  'a blocked user cannot post in the shared thread'
+);
+
+select assert_denied(
+  '11111111-1111-1111-1111-111111111111',
+  $$select block_user('11111111-1111-1111-1111-111111111111')$$,
+  'you cannot block yourself'
+);
+
 \echo 'all RLS tests passed'

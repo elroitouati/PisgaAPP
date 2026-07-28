@@ -18,6 +18,7 @@ import Library from '@/pages/Library'
 import Achievements from '@/pages/Achievements'
 import Calendar from '@/pages/Calendar'
 import Friends from '@/pages/Friends'
+import Chat from '@/pages/Chat'
 import Profile from '@/pages/Profile'
 import NotFound from '@/pages/NotFound'
 import SetupRequired from '@/pages/SetupRequired'
@@ -49,6 +50,8 @@ export default function App() {
                       <Route path="/onboarding" element={<Onboarding />} />
                       {/* Full-screen, outside the shell — no bottom bar. */}
                       <Route path="/session/:goalId" element={<GuidedSession />} />
+                      {/* Full height, own composer — outside the shell. */}
+                      <Route path="/chat/:conversationId" element={<Chat />} />
 
                       <Route element={<AppShell />}>
                         <Route path="/" element={<Home />} />

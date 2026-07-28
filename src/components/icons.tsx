@@ -197,3 +197,24 @@ export const CalendarIcon = (p: IconProps) => (
     <path d="M4 10h16M9 3v4M15 3v4" />
   </Icon>
 )
+
+/** Solid paper plane; points along the reading direction like BackIcon. */
+export const SendIcon = ({ size = 22, className = '', ...rest }: IconProps) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    aria-hidden="true"
+    className={`ltr:-scale-x-100 ${className}`}
+    {...rest}
+  >
+    <path d="M20.5 12 3.5 4.5l3 7.5-3 7.5z" />
+  </svg>
+)
+
+export const ChatIcon = (p: IconProps) => (
+  <Icon strokeWidth={1.6} {...p}>
+    <path d="M4 12a8 8 0 1 1 3.5 6.6L4 20l1.4-3.4A8 8 0 0 1 4 12z" />
+  </Icon>
+)
