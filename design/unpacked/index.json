@@ -1,61 +1,61 @@
 [
   {
-    "uuid": "63faa4e7-39ce-42a3-afb9-35f1a92bd4f5",
-    "name": "asset-63faa4e7.png",
-    "mime": "image/png",
-    "bytes": 757425
-  },
-  {
-    "uuid": "ae72934b-4c3a-46bc-b8bf-ccb26a8dae45",
-    "name": "asset-ae72934b.png",
+    "uuid": "bd79513d-4c3a-4c06-a3ac-22c643083a6e",
+    "name": "asset-bd79513d.png",
     "mime": "image/png",
     "bytes": 682847
   },
   {
-    "uuid": "23198e70-ba31-4482-ac0e-39ebf47e00f4",
-    "name": "asset-23198e70.javascript",
+    "uuid": "682c3251-a25e-4007-8051-e9e4193ae33d",
+    "name": "asset-682c3251.png",
+    "mime": "image/png",
+    "bytes": 757425
+  },
+  {
+    "uuid": "ce0a3f31-8e85-4181-9419-4b0bd8d258ab",
+    "name": "asset-ce0a3f31.javascript",
     "mime": "text/javascript",
     "bytes": 69150
   },
   {
-    "uuid": "6f11cfce-90fc-48f7-8e2f-c6550036a858",
-    "name": "vendor-6f11cfce.javascript",
+    "uuid": "d52cedbd-0c50-4d09-86b0-af0dd02b4396",
+    "name": "vendor-d52cedbd.javascript",
     "mime": "text/javascript",
     "bytes": 10751
   },
   {
-    "uuid": "eb4db7d0-b9a6-4f7b-bd5d-c7d5961aa2d1",
-    "name": "vendor-eb4db7d0.javascript",
+    "uuid": "7c2a2f5a-8f02-46d1-8601-917bb036090d",
+    "name": "vendor-7c2a2f5a.javascript",
     "mime": "text/javascript",
     "bytes": 131835
   },
   {
-    "uuid": "4feb50c2-bbc2-4a16-b60a-8f7ceab526ae",
-    "name": "asset-4feb50c2.woff2",
+    "uuid": "187edf3f-009a-484f-844a-15fda65288b4",
+    "name": "asset-187edf3f.woff2",
     "mime": "font/woff2",
     "bytes": 12036
   },
   {
-    "uuid": "78613c42-32b5-4523-946e-0c9e9f1aba25",
-    "name": "asset-78613c42.woff2",
+    "uuid": "ca033ce4-a9ec-44a9-aa2f-c01b4f39dfc3",
+    "name": "asset-ca033ce4.woff2",
     "mime": "font/woff2",
     "bytes": 23740
   },
   {
-    "uuid": "e7f04b2e-68f2-4097-bbcb-f7b667eeb197",
-    "name": "asset-e7f04b2e.woff2",
+    "uuid": "3c58e40c-6a6c-43ed-bca1-dbe706128ac4",
+    "name": "asset-3c58e40c.woff2",
     "mime": "font/woff2",
     "bytes": 14192
   },
   {
-    "uuid": "bd2ec6d7-e900-480e-be3c-a6e098b50475",
-    "name": "asset-bd2ec6d7.woff2",
+    "uuid": "42505dab-22fb-4f4b-bb1d-9d38b9948e99",
+    "name": "asset-42505dab.woff2",
     "mime": "font/woff2",
     "bytes": 14748
   },
   {
-    "uuid": "ef297161-fc21-4a81-8dc3-723d5be36e77",
-    "name": "asset-ef297161.woff2",
+    "uuid": "1ebf05db-465f-4fb4-a097-d92375651de0",
+    "name": "asset-1ebf05db.woff2",
     "mime": "font/woff2",
     "bytes": 30116
   }

@@ -68,6 +68,11 @@
      light (oklch ~0.75), so white on them would be barely legible. */
   --color-on-cat: var(--pisga-bg);
 
+  /* Backdrop behind a bottom sheet. Not simply black at two opacities: the
+     handoff uses a lighter, thinner scrim in light mode and a heavier one in
+     dark, so the sheet reads as lifted in both. */
+  --color-scrim: var(--pisga-scrim);
+
   --color-cat-physical: var(--pisga-phys);
   --color-cat-academic: var(--pisga-study);
   --color-cat-social: var(--pisga-social);
@@ -100,6 +105,7 @@
      toward the card surface, not black — mixing toward black in dark mode
      darkens the tile well past what the handoff draws. */
   --pisga-tint-base: #fff;
+  --pisga-scrim: rgba(20, 20, 18, 0.32);
   color-scheme: light;
 }
 
@@ -118,6 +124,7 @@
   --pisga-pers: oklch(0.75 0.055 55);
 
   --pisga-tint-base: var(--pisga-card);
+  --pisga-scrim: rgba(6, 7, 8, 0.55);
   color-scheme: dark;
 }
 

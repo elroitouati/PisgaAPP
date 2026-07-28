@@ -1,4 +1,5 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { NavLink } from 'react-router-dom'
 import {
   HomeIcon,
   TrophyIcon,
@@ -7,6 +8,7 @@ import {
   ProfileIcon,
 } from '@/components/icons'
 import { useI18n } from '@/i18n/useI18n'
+import { AddGoalSheet } from './AddGoalSheet'
 import type { TranslationKey } from '@/i18n/translations'
 
 const TABS = [
@@ -24,31 +26,37 @@ const TABS = [
  */
 export function BottomNav() {
   const { t } = useI18n()
-  const navigate = useNavigate()
+  const [sheetOpen, setSheetOpen] = useState(false)
 
   const [home, achievements, friends, profile] = TABS
 
   return (
-    <nav
-      aria-label={t('nav.home')}
-      className="border-line bg-bg/92 fixed inset-x-0 bottom-0 z-20 mx-auto flex h-[74px] max-w-md items-center justify-around border-t px-1.5 pb-2 backdrop-blur-[14px]"
-      style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
-    >
-      <Tab {...home} />
-      <Tab {...achievements} />
-
-      <button
-        type="button"
-        onClick={() => navigate('/library')}
-        aria-label={t('nav.add')}
-        className="border-fg text-fg flex size-11 items-center justify-center rounded-full border-[1.4px]"
+    <>
+      <nav
+        aria-label={t('nav.home')}
+        className="border-line bg-bg/92 fixed inset-x-0 bottom-0 z-20 mx-auto flex h-[74px] max-w-md items-center justify-around border-t px-1.5 pb-2 backdrop-blur-[14px]"
+        style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
       >
-        <PlusIcon size={22} />
-      </button>
+        <Tab {...home} />
+        <Tab {...achievements} />
 
-      <Tab {...friends} />
-      <Tab {...profile} />
-    </nav>
+        <button
+          type="button"
+          onClick={() => setSheetOpen(true)}
+          aria-label={t('nav.add')}
+          className="border-fg text-fg flex size-11 items-center justify-center rounded-full border-[1.4px]"
+        >
+          <PlusIcon size={22} />
+        </button>
+
+        <Tab {...friends} />
+        <Tab {...profile} />
+      </nav>
+
+      {/* Outside <nav> on purpose — the bar's backdrop-filter would otherwise
+          become the containing block and trap this fixed overlay inside it. */}
+      <AddGoalSheet open={sheetOpen} onClose={() => setSheetOpen(false)} />
+    </>
   )
 }
 

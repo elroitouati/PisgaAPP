@@ -19,6 +19,7 @@ import Achievements from '@/pages/Achievements'
 import Calendar from '@/pages/Calendar'
 import Friends from '@/pages/Friends'
 import Chat from '@/pages/Chat'
+import SharedGoal from '@/pages/SharedGoal'
 import Profile from '@/pages/Profile'
 import NotFound from '@/pages/NotFound'
 import SetupRequired from '@/pages/SetupRequired'
@@ -52,6 +53,7 @@ export default function App() {
                       <Route path="/session/:goalId" element={<GuidedSession />} />
                       {/* Full height, own composer — outside the shell. */}
                       <Route path="/chat/:conversationId" element={<Chat />} />
+                      <Route path="/shared-goal" element={<SharedGoal />} />
 
                       <Route element={<AppShell />}>
                         <Route path="/" element={<Home />} />

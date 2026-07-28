@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useI18n } from '@/i18n/useI18n'
 import { useAuth } from '@/providers/useAuth'
 import { useAsync } from '@/hooks/useAsync'
@@ -22,7 +22,9 @@ export default function Library() {
   const [tab, setTab] = useState<Category>('physical')
   const [adopting, setAdopting] = useState<string | null>(null)
   const [adopted, setAdopted] = useState<Set<string>>(new Set())
-  const [showCustom, setShowCustom] = useState(false)
+  // The sheet's "your own goal" choice lands here with the form already open.
+  const [params] = useSearchParams()
+  const [showCustom, setShowCustom] = useState(params.get('new') === '1')
 
   const library = useAsync<LibraryGoal[]>(() => fetchLibrary(), [])
   const mine = useAsync(

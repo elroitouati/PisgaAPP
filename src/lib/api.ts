@@ -77,7 +77,12 @@ export async function fetchLibrary(): Promise<LibraryGoal[]> {
  * `points` is deliberately not sent — a database trigger copies it from the
  * library so a client cannot name its own score.
  */
-export async function adoptLibraryGoal(userId: string, goal: LibraryGoal): Promise<UserGoal> {
+export async function adoptLibraryGoal(
+  userId: string,
+  goal: LibraryGoal,
+  /** A shared challenge adopts the same goal but with an end date. */
+  overrides?: { goalType?: UserGoal['goal_type']; targetDate?: string },
+): Promise<UserGoal> {
   return unwrap(
     await supabase
       .from('user_goals')
@@ -88,9 +93,10 @@ export async function adoptLibraryGoal(userId: string, goal: LibraryGoal): Promi
         title: goal.title_he,
         description: goal.description_he,
         category: goal.category,
-        goal_type: goal.goal_type,
+        goal_type: overrides?.goalType ?? goal.goal_type,
         verification: goal.verification,
         session_config: goal.session_config,
+        target_date: overrides?.targetDate ?? null,
       })
       .select('*')
       .single(),
@@ -404,4 +410,57 @@ export async function shareGoal(userGoalId: string, friendId: string): Promise<v
     .from('goal_shares')
     .insert({ user_goal_id: userGoalId, shared_with_user_id: friendId })
   if (error) throw new Error(error.message)
+}
+
+/**
+ * Library goals to suggest to this user: the categories they picked in
+ * onboarding, minus anything they already have. Falls back to the whole
+ * library when the questionnaire was skipped, so the list is never empty for
+ * the wrong reason.
+ *
+ * This is what makes the questionnaire pay off — without it a new user answers
+ * three questions and lands on an empty home screen.
+ */
+export async function fetchSuggestions(userId: string, limit = 6): Promise<LibraryGoal[]> {
+  const [answers, library, mine] = await Promise.all([
+    fetchOnboardingAnswers(userId),
+    fetchLibrary(),
+    supabase.from('user_goals').select('library_id').eq('user_id', userId).eq('active', true),
+  ])
+
+  const adopted = new Set(
+    ((unwrap(mine) as { library_id: string | null }[]) ?? [])
+      .map((row) => row.library_id)
+      .filter(Boolean),
+  )
+
+  const focus = Array.isArray(answers.focus_categories)
+    ? (answers.focus_categories as Category[])
+    : []
+
+  const available = library.filter((goal) => !adopted.has(goal.id))
+  const preferred = focus.length > 0
+    ? available.filter((goal) => focus.includes(goal.category))
+    : available
+
+  // One from each chosen category first, so the suggestions look deliberate
+  // rather than like the top of an alphabetical list.
+  const spread: LibraryGoal[] = []
+  const seen = new Set<string>()
+  for (const category of focus.length > 0 ? focus : CATEGORIES) {
+    const pick = preferred.find((goal) => goal.category === category && !seen.has(goal.id))
+    if (pick) {
+      spread.push(pick)
+      seen.add(pick.id)
+    }
+  }
+  for (const goal of preferred) {
+    if (spread.length >= limit) break
+    if (!seen.has(goal.id)) {
+      spread.push(goal)
+      seen.add(goal.id)
+    }
+  }
+
+  return spread.slice(0, limit)
 }

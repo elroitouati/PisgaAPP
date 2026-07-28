@@ -49,7 +49,8 @@ src/
   lib/           supabase, api (שאילתות), categories, scoring, dates, quotes
   components/    ui, icons, GoalRow, BottomNav, AppShell
   pages/         Login, Onboarding, Home, CategoryScreen, GuidedSession,
-                 Library, Achievements, Calendar, Friends, Profile
+                 Library, Achievements, Calendar, Friends, Chat, SharedGoal,
+                 Profile
 supabase/
   migrations/    סכמה + seed
   tests/         harness + בדיקות RLS
@@ -69,6 +70,11 @@ scripts/
 הגופן Heebo מאוחסן מקומית ב‑`public/fonts` כדי שהאפליקציה תשמור על הטיפוגרפיה גם במצב לא מקוון.
 
 ### בהיר מול כהה
+
+לכל מסך אמיתי בעיצוב יש שתי גרסאות, וכל מסך נבנה **פעם אחת** — הטוקנים מספקים את
+שתיהן. לפני כל מסך חדש אני משווה את הליטרלים בזוג; עד היום זה הניב שלושה טוקנים בלבד
+שבהם המצבים באמת נבדלים: `--color-on-cat`, `--pisga-tint-base` ו‑`--color-scrim`.
+
 
 שתי הפלטות נלקחו מהעיצוב: הבהירה מסבב 5, הכהה מסבבים 2‑4. המצב נקבע לפי
 `data-theme` על ה‑`<html>` ומוחל לפני הציור הראשון (סקריפט קצר ב‑`index.html`),
@@ -121,6 +127,5 @@ scripts/
 - **שלושה ייחוסי ציטוט שנויים במחלוקת** — מסומנים `disputed` ב‑`src/lib/quotes.ts`
   (אריסטו/ויל דוראנט, לינקולן, ושם המחבר של הציטוט הראשון).
 - **סנכרון צעדים** — מטרות `sensor_sync` מציגות שהחיבור אינו קיים במקום לקבל דיווח עצמי.
-- **אתגרים משותפים ומסך 4b** — התשתית (`goal_shares`) והבאדג׳ קיימים, המסכים לא.
 - **ציר הזמן בלוח השנה** — PRD 6.5 מבקש גם מטרות עם תאריך יעד ואבני דרך;
   העיצוב מצייר רק את רשת ההשלמות היומיות, אז זה מה שנבנה.
