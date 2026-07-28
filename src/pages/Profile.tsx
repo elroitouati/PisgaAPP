@@ -1,7 +1,8 @@
 import { useI18n } from '@/i18n/useI18n'
 import { useAuth } from '@/providers/useAuth'
 import { useProfile } from '@/providers/useProfile'
-import { LanguageToggle, ThemeToggle } from '@/components/SettingsToggles'
+import { LanguageToggle } from '@/components/SettingsToggles'
+import { ThemeSwitch } from '@/components/ThemeSwitch'
 import { Card, SectionLabel } from '@/components/ui'
 import { SummitIcon } from '@/components/icons'
 import { useState } from 'react'
@@ -52,7 +53,7 @@ export default function Profile() {
       <div className="mt-6 mb-2.5">
         <SectionLabel>{t('common.theme')}</SectionLabel>
       </div>
-      <ThemeToggle />
+      <ThemeSwitch />
 
       {/* Presence tells friends when you have the app open, so it is opt-out
           rather than always-on. */}

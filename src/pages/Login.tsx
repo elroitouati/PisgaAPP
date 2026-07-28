@@ -6,6 +6,7 @@ import type { TranslationKey } from '@/i18n/translations'
 import { useTheme } from '@/providers/useTheme'
 import { Spinner } from '@/components/Spinner'
 import { BackIcon, MailIcon } from '@/components/icons'
+import { ThemeSwitch } from '@/components/ThemeSwitch'
 
 type Mode = 'choose' | 'signIn' | 'signUp'
 type Busy = null | 'google' | 'form'
@@ -76,6 +77,8 @@ export default function Login() {
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col px-6 pt-16 pb-9">
+      <ThemeSwitch className="self-end" />
+
       {/* The full mountain lockup is reserved for this screen (PRD 7). */}
       <div className="my-3.5 flex flex-1 flex-col items-center justify-center gap-[22px]">
         <img
