@@ -20,6 +20,7 @@ npm run dev
 2. הריצו את המיגרציות לפי הסדר, מתוך ה‑SQL Editor:
    - `supabase/migrations/0001_initial_schema.sql` — טבלאות, enums, RLS, פונקציות
    - `supabase/migrations/0002_seed_goals_library.sql` — תוכן ספריית המטרות
+   - `supabase/migrations/0003_badges.sql` — באדג׳ים ולוגיקת ההענקה
 3. ב‑Authentication → Providers: הפעילו Email והפעילו Google (עם ה‑Client ID/Secret מ‑Google Cloud).
 4. ב‑Authentication → URL Configuration: הוסיפו את `http://localhost:5173/auth/callback`
    ואת כתובת הפרודקשן ל‑Redirect URLs.
@@ -28,7 +29,7 @@ npm run dev
 
 ```bash
 npm run build                  # typecheck + build
-./scripts/verify-sql.sh        # מיגרציות + 27 בדיקות RLS על Postgres זמני
+./scripts/verify-sql.sh        # מיגרציות + 41 בדיקות RLS ובאדג׳ים על Postgres זמני
 ```
 
 `verify-sql.sh` דורש Postgres מקומי; העבירו לו `PGHOST`/`PGPORT`/`PGUSER`.
@@ -41,10 +42,11 @@ npm run build                  # typecheck + build
 src/
   i18n/          מילון he/en + ספק שפה (מחליף גם את כיוון הדף)
   providers/     Auth, Profile, Theme
-  hooks/         useGoals (מעקב יומי), useGuidedSession (טיימר), useAsync
+  hooks/         useGoals (מעקב יומי), useGuidedSession (טיימר), useBadges, useAsync
   lib/           supabase, api (שאילתות), categories, scoring, dates, quotes
   components/    ui, icons, GoalRow, BottomNav, AppShell
-  pages/         Login, Onboarding, Home, CategoryScreen, GuidedSession, Library, Profile
+  pages/         Login, Onboarding, Home, CategoryScreen, GuidedSession,
+                 Library, Achievements, Profile
 supabase/
   migrations/    סכמה + seed
   tests/         harness + בדיקות RLS
@@ -63,12 +65,20 @@ scripts/
 (`design/unpacked/design.html`). החלפת פלטה היא שינוי בקובץ אחד.
 הגופן Heebo מאוחסן מקומית ב‑`public/fonts` כדי שהאפליקציה תשמור על הטיפוגרפיה גם במצב לא מקוון.
 
+## באדג'ים
+
+שמונה הקריטריונים סגורים ומיושמים ב‑`supabase/migrations/0003_badges.sql`.
+ההענקה רצה כולה בצד השרת — ל‑`user_badges` אין policy של הכנסה לקליינט, כך שהדרך היחידה
+לבאדג' היא דרך `evaluate_badges()`. באדג' שהוענק אינו נשלל בביטול סימון.
+
+הגדרת "שבוע" ב'מטפס מאוזן' היא ראשון–שבת (לא ISO), לפי הלוח הישראלי.
+מטרה ארוכת טווח נחשבת שהושלמה כשמסמנים אותה דרך `finish_goal()` — שדה `completed_at`
+נוסף במיוחד כדי להבחין בין "עבדתי על זה היום" לבין "סיימתי".
+
 ## מה עדיין פתוח
 
 מסומן בקוד ב‑`⚠ PROVISIONAL` ומרוכז כאן:
 
-- **קריטריונים לבאדג'ים** — הטבלאות קיימות, לוגיקת ההענקה לא. אין לקליינט הרשאת כתיבה
-  ל‑`user_badges` בכוונה, כדי שהענקה תתבצע רק בצד השרת (PRD 13).
 - **נוסחת הנקודות** — לא מוגדרת ב‑PRD. `src/lib/scoring.ts` מחזיק טבלת משקלים זמנית
   לפי שיטת האימות. מה שכן סגור ומיושם: רק מטרות מובנות צוברות נקודות (PRD 3.1).
 - **תוכן ספריית המטרות** — 21 מטרות כהצעה ראשונה (PRD 13).

@@ -137,6 +137,12 @@ const he = {
   'timer.complete': 'כל הכבוד, סיימת!',
   'timer.exitConfirm': 'לצאת בלי לשמור את האימון?',
 
+  'badges.title': 'הישגים',
+  'badges.collected': 'באדג׳ים נאספו',
+  'badges.recent': 'נאספו לאחרונה',
+  'badges.locked': 'עדיין נעולים',
+  'badges.none': 'עוד לא אספת באדג׳ים. כל מטרה שתשלימו מקרבת אתכם.',
+
   'setup.title': 'חסרה הגדרת Supabase',
   'setup.body':
     'צרו קובץ .env.local על בסיס .env.example והזינו את VITE_SUPABASE_URL ואת VITE_SUPABASE_ANON_KEY.',
@@ -275,6 +281,12 @@ const en: Record<TranslationKey, string> = {
   'timer.finish': 'Finish and save',
   'timer.complete': 'Nice work — that’s a wrap!',
   'timer.exitConfirm': 'Leave without saving this session?',
+
+  'badges.title': 'Achievements',
+  'badges.collected': 'badges collected',
+  'badges.recent': 'Recently earned',
+  'badges.locked': 'Still locked',
+  'badges.none': 'No badges yet. Every goal you finish brings one closer.',
 
   'setup.title': 'Supabase is not configured',
   'setup.body':

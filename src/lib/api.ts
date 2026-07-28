@@ -1,6 +1,8 @@
 import { supabase } from './supabase'
 import { todayKey, yesterdayKey } from './dates'
 import type {
+  Badge,
+  EarnedBadge,
   GoalCompletion,
   LibraryGoal,
   Profile,
@@ -194,5 +196,34 @@ export async function undoCompletion(userGoalId: string): Promise<void> {
     .delete()
     .eq('user_goal_id', userGoalId)
     .eq('completed_date', todayKey())
+  if (error) throw new Error(error.message)
+}
+
+// ── Badges (PRD 6.6) ─────────────────────────────────────────────────────────
+
+/**
+ * The whole catalogue plus which of them this user has earned. Locked badges
+ * are shown too (design 5d), so the list is never filtered server-side.
+ */
+export async function fetchBadges(userId: string): Promise<EarnedBadge[]> {
+  const [catalogue, earned] = await Promise.all([
+    supabase.from('badges').select('*').order('sort_order', { ascending: true }),
+    supabase.from('user_badges').select('badge_id, earned_at').eq('user_id', userId),
+  ])
+
+  const all = unwrap(catalogue) as Badge[]
+  const mine = new Map(
+    (unwrap(earned) as { badge_id: string; earned_at: string }[]).map((row) => [
+      row.badge_id,
+      row.earned_at,
+    ]),
+  )
+
+  return all.map((badge) => ({ ...badge, earnedAt: mine.get(badge.id) ?? null }))
+}
+
+/** Marks a deadline or long-term goal finished (PRD 4). */
+export async function finishGoal(userGoalId: string): Promise<void> {
+  const { error } = await supabase.rpc('finish_goal', { p_user_goal_id: userGoalId })
   if (error) throw new Error(error.message)
 }

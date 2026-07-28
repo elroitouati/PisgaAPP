@@ -15,6 +15,7 @@ import Home from '@/pages/Home'
 import CategoryScreen from '@/pages/CategoryScreen'
 import GuidedSession from '@/pages/GuidedSession'
 import Library from '@/pages/Library'
+import Achievements from '@/pages/Achievements'
 import Profile from '@/pages/Profile'
 import NotFound from '@/pages/NotFound'
 import SetupRequired from '@/pages/SetupRequired'
@@ -51,6 +52,7 @@ export default function App() {
                         <Route path="/" element={<Home />} />
                         <Route path="/category/:category" element={<CategoryScreen />} />
                         <Route path="/library" element={<Library />} />
+                        <Route path="/achievements" element={<Achievements />} />
                         <Route path="/profile" element={<Profile />} />
                       </Route>
                     </Route>

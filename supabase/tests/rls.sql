@@ -303,4 +303,172 @@ reset role; reset request.jwt.claim.sub;
 select assert((select goals from mallory_pending) = 0,
   'a pending friend request does not grant read access');
 
+-- -----------------------------------------------------------------------------
+-- Badges (0003) — every criterion, plus the rule that only the server awards.
+-- -----------------------------------------------------------------------------
+
+-- Alice already has completions from the streak tests above.
+select assert(
+  exists (
+    select 1 from user_badges ub
+    join badges b on b.id = ub.badge_id
+    where ub.user_id = '11111111-1111-1111-1111-111111111111' and b.slug = 'first-step'
+  ),
+  'the first completion awards "the first step"'
+);
+
+select assert(
+  not exists (
+    select 1 from user_badges ub
+    join badges b on b.id = ub.badge_id
+    where ub.user_id = '11111111-1111-1111-1111-111111111111' and b.slug = 'week-on-summit'
+  ),
+  'a 3-day streak does not yet award the 7-day badge'
+);
+
+-- Push one goal past 30 consecutive days, which also carries the account past
+-- the 50-completion mark (46 here plus the 5 recorded earlier).
+do $$
+declare d date;
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  for d in select generate_series(current_date - 45, current_date, interval '1 day')::date loop
+    -- This fixture goal is checkbox_reflection, so every day needs a note.
+    perform record_goal_completion('aaaa0003-0000-0000-0000-000000000003', 'דיברנו', d);
+  end loop;
+  reset role;
+end $$;
+
+select assert(
+  (select max(current_streak) from goal_completions
+   where user_goal_id = 'aaaa0003-0000-0000-0000-000000000003') = 46,
+  '46 consecutive days build a streak of 46'
+);
+
+select assert(
+  exists (select 1 from user_badges ub join badges b on b.id = ub.badge_id
+          where ub.user_id = '11111111-1111-1111-1111-111111111111' and b.slug = 'week-on-summit'),
+  'a 7-day streak awards "a week on the summit"'
+);
+
+select assert(
+  exists (select 1 from user_badges ub join badges b on b.id = ub.badge_id
+          where ub.user_id = '11111111-1111-1111-1111-111111111111' and b.slug = 'unstoppable'),
+  'a 30-day streak awards "unstoppable"'
+);
+
+select assert(
+  exists (select 1 from user_badges ub join badges b on b.id = ub.badge_id
+          where ub.user_id = '11111111-1111-1111-1111-111111111111' and b.slug = 'mileage-50'),
+  '50 cumulative completions award the mileage badge'
+);
+
+select assert(
+  not exists (select 1 from user_badges ub join badges b on b.id = ub.badge_id
+              where ub.user_id = '11111111-1111-1111-1111-111111111111' and b.slug = 'progress-machine'),
+  'under 200 completions does not award "progress machine"'
+);
+
+-- balanced-climber: alice has physical + personal + social goals completed, but
+-- academic is missing, so the badge must stay locked.
+select assert(
+  not exists (select 1 from user_badges ub join badges b on b.id = ub.badge_id
+              where ub.user_id = '11111111-1111-1111-1111-111111111111' and b.slug = 'balanced-climber'),
+  'three categories in a week is not enough for "balanced climber"'
+);
+
+insert into user_goals (id, user_id, is_custom, title, category, goal_type, verification)
+values ('aaaa0004-0000-0000-0000-000000000004', '11111111-1111-1111-1111-111111111111',
+        true, 'ללמוד משהו', 'academic', 'daily', 'daily_checkin');
+
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  -- Same week as the physical/social/personal completions recorded above.
+  perform record_goal_completion('aaaa0004-0000-0000-0000-000000000004', null, current_date);
+  reset role;
+end $$;
+
+select assert(
+  exists (select 1 from user_badges ub join badges b on b.id = ub.badge_id
+          where ub.user_id = '11111111-1111-1111-1111-111111111111' and b.slug = 'balanced-climber'),
+  'all four categories in one week awards "balanced climber"'
+);
+
+-- reached-the-summit: only a finished long-term goal counts.
+insert into user_goals (id, user_id, is_custom, title, category, goal_type, verification, target_date)
+values ('aaaa0005-0000-0000-0000-000000000005', '11111111-1111-1111-1111-111111111111',
+        true, 'לרוץ 10 ק"מ', 'physical', 'long_term', 'checkbox_reflection', current_date + 90);
+
+select assert(
+  not exists (select 1 from user_badges ub join badges b on b.id = ub.badge_id
+              where ub.user_id = '11111111-1111-1111-1111-111111111111' and b.slug = 'reached-the-summit'),
+  'merely having a long-term goal does not award the summit badge'
+);
+
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  perform finish_goal('aaaa0005-0000-0000-0000-000000000005');
+  reset role;
+end $$;
+
+select assert(
+  exists (select 1 from user_badges ub join badges b on b.id = ub.badge_id
+          where ub.user_id = '11111111-1111-1111-1111-111111111111' and b.slug = 'reached-the-summit'),
+  'finishing a long-term goal awards "I reached the summit"'
+);
+
+select assert_denied(
+  '11111111-1111-1111-1111-111111111111',
+  $$select finish_goal('aaaa0001-0000-0000-0000-000000000001')$$,
+  'a daily goal cannot be "finished" — it only has streaks'
+);
+
+-- not-alone: sharing a personal goal with a friend.
+select assert(
+  not exists (select 1 from user_badges ub join badges b on b.id = ub.badge_id
+              where ub.user_id = '11111111-1111-1111-1111-111111111111' and b.slug = 'not-alone'),
+  'the sharing badge is locked before any goal is shared'
+);
+
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  insert into goal_shares (user_goal_id, shared_with_user_id)
+  values ('aaaa0002-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222');
+  reset role;
+end $$;
+
+select assert(
+  exists (select 1 from user_badges ub join badges b on b.id = ub.badge_id
+          where ub.user_id = '11111111-1111-1111-1111-111111111111' and b.slug = 'not-alone'),
+  'sharing a personal goal awards "not climbing alone"'
+);
+
+-- Badges are per-user: none of alice's activity leaks to bob.
+select assert(
+  (select count(*) from user_badges where user_id = '22222222-2222-2222-2222-222222222222') = 0,
+  'a friend earns nothing from your activity'
+);
+
+-- Awarding is idempotent — a second pass must not duplicate anything.
+do $$
+declare before_count int; after_count int;
+begin
+  select count(*) into before_count from user_badges
+  where user_id = '11111111-1111-1111-1111-111111111111';
+  perform evaluate_badges('11111111-1111-1111-1111-111111111111');
+  select count(*) into after_count from user_badges
+  where user_id = '11111111-1111-1111-1111-111111111111';
+  if before_count <> after_count then
+    raise exception 'FAILED: re-evaluating badges duplicated rows (% → %)', before_count, after_count;
+  end if;
+  raise notice 'ok: re-evaluating badges awards nothing twice';
+end $$;
+
 \echo 'all RLS tests passed'

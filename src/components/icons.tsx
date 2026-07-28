@@ -166,3 +166,19 @@ export const PlayIcon = (p: IconProps) => (
   </Icon>
 )
 
+
+export const LockIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="5" y="11" width="14" height="9" rx="2" />
+    <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+  </Icon>
+)
+
+export const FlameIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 3l7 9-7 9-7-9z" />
+  </Icon>
+)
+
+export const TargetIcon = PersonalIcon
+export const ActivityIcon = PhysicalIcon

@@ -96,3 +96,21 @@ export type TrackedGoal = UserGoal & {
   streak: number
   todaysNote: string | null
 }
+
+/** Icon key stored on a badge, resolved to a component in the achievements UI. */
+export type BadgeIcon = 'summit' | 'check' | 'flame' | 'target' | 'activity' | 'friends'
+
+export type Badge = {
+  id: string
+  slug: string
+  title_he: string
+  title_en: string
+  description_he: string | null
+  description_en: string | null
+  icon: BadgeIcon
+  /** Category whose colour tints the badge, or null for a neutral one. */
+  accent: Category | null
+  sort_order: number
+}
+
+export type EarnedBadge = Badge & { earnedAt: string | null }

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useI18n } from '@/i18n/useI18n'
 import { useProfile } from '@/providers/useProfile'
 import { useTrackedGoals, type CategorySummary } from '@/hooks/useGoals'
+import { useBadges } from '@/hooks/useBadges'
 import { CATEGORY_META } from '@/lib/categories'
 import { overallStreak, pointsEarnedToday } from '@/lib/scoring'
 import { BellIcon, SummitIcon } from '@/components/icons'
@@ -21,6 +22,7 @@ export default function Home() {
   const { t, lang } = useI18n()
   const { profile } = useProfile()
   const { goals, byCategory, pending, loading, error, reload } = useTrackedGoals()
+  const { earned } = useBadges()
 
   const firstName = profile?.display_name?.split(' ')[0] ?? ''
   const today = new Date()
@@ -61,9 +63,7 @@ export default function Home() {
               value: pointsEarnedToday(goals).toLocaleString(lang === 'he' ? 'he-IL' : 'en-US'),
               label: t('home.stat.points'),
             },
-            // Badge criteria are still an open question (PRD 13), so nothing
-            // is awarded yet and the count is honestly zero.
-            { value: '0', label: t('home.stat.badges') },
+            { value: String(earned.length), label: t('home.stat.badges') },
           ]}
         />
       </div>
