@@ -10,7 +10,6 @@ import { blockUser } from '@/lib/chat'
 import { categoryStyle } from '@/lib/categories'
 import { BackIcon, CloseIcon, GearIcon, PlusIcon, SendIcon, SummitIcon } from '@/components/icons'
 import { Spinner } from '@/components/Spinner'
-import { GroupManageSheet } from '@/components/GroupManageSheet'
 import type { ChatMessage } from '@/lib/chat'
 
 /** Designs 7b (light) and 7a (dark) — one screen, both palettes. */
@@ -28,7 +27,6 @@ export default function Chat() {
   const [draft, setDraft] = useState('')
   const [editing, setEditing] = useState<ChatMessage | null>(null)
   const [sharing, setSharing] = useState(false)
-  const [managing, setManaging] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -127,7 +125,7 @@ export default function Chat() {
         ) : conversation?.kind === 'group' ? (
           <button
             type="button"
-            onClick={() => setManaging(true)}
+            onClick={() => navigate(`/chat/${conversationId}/manage`)}
             aria-label={t('group.manage')}
             className="text-fg-muted flex"
           >
@@ -249,10 +247,6 @@ export default function Chat() {
           {busy ? <Spinner className="size-4 border-current/30 border-t-current" /> : <SendIcon size={17} />}
         </button>
       </form>
-
-      {managing && conversationId ? (
-        <GroupManageSheet conversationId={conversationId} onClose={() => setManaging(false)} />
-      ) : null}
     </div>
   )
 }

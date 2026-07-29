@@ -166,6 +166,7 @@ const he = {
   'friends.notStartedYet': 'עדיין לא התחיל היום',
   'friends.completedToday': 'מטרות הושלמו היום',
   'friends.empty': 'עוד אין לך חברים. הוסיפו חבר כדי להשוות התקדמות.',
+  'friends.recentlyJoined': 'הצטרפ/ה לאחרונה',
 
   'friends.tabChallenges': 'אתגרים',
   'friends.tabAll': 'כל החברים',
@@ -322,13 +323,24 @@ const he = {
 
   // Group management (undesigned settings sheet)
   'group.manage': 'ניהול קבוצה',
-  'group.postingMode': 'רק אני יכול לכתוב',
-  'group.postingModeSub': 'כשזה פעיל, רק את/ה יכולים לשלוח הודעות בקבוצה',
-  'group.members': 'חברים בקבוצה',
-  'group.addMember': 'הוספת חבר',
+  'group.postingMode': 'רק מנהלים יכולים לשלוח הודעות',
+  'group.postingModeSub': 'שאר החברים יוכלו רק לקרוא',
+  'group.members': 'חברי הקבוצה',
+  'group.settings': 'הגדרות שיחה',
+  'group.memberCount': 'חברים',
+  'group.you': 'את/ה',
+  'group.admin': 'מנהל/ת',
+  'group.addMember': 'הוספת חברים',
   'group.removeMember': 'הסרה',
   'group.noFriendsToAdd': 'כל החברים שלך כבר בקבוצה',
-  'group.owner': 'הבעלים',
+  'group.leave': 'עזיבת הקבוצה',
+  'group.leaveError': 'עזיבת הקבוצה נכשלה',
+  'group.leaveWarningTitle': 'את/ה המנהל/ת היחיד/ה',
+  'group.leaveWarningBody':
+    'לפני שתעזוב/י, מנה/י לתפקיד מנהל חבר אחר בקבוצה — אחרת הקבוצה תישאר ללא ניהול.',
+  'group.promoteOther': 'מנה מנהל אחר',
+  'group.cancel': 'ביטול',
+  'group.choosePromote': 'בחר/י מי יהיה/תהיה מנהל/ת',
 } as const
 
 export type TranslationKey = keyof typeof he
@@ -486,6 +498,7 @@ const en: Record<TranslationKey, string> = {
   'friends.notStartedYet': 'Hasn’t started today',
   'friends.completedToday': 'goals completed today',
   'friends.empty': 'No friends yet. Add one to compare progress.',
+  'friends.recentlyJoined': 'Recently joined',
 
   'friends.tabChallenges': 'Challenges',
   'friends.tabAll': 'All friends',
@@ -634,13 +647,24 @@ const en: Record<TranslationKey, string> = {
   'join.loading': 'Loading invite…',
 
   'group.manage': 'Manage group',
-  'group.postingMode': 'Only I can post',
-  'group.postingModeSub': 'When on, only you can send messages in this group',
+  'group.postingMode': 'Only admins can send messages',
+  'group.postingModeSub': 'Other members can only read',
   'group.members': 'Group members',
-  'group.addMember': 'Add a member',
+  'group.settings': 'Conversation settings',
+  'group.memberCount': 'members',
+  'group.you': 'you',
+  'group.admin': 'Admin',
+  'group.addMember': 'Add members',
   'group.removeMember': 'Remove',
   'group.noFriendsToAdd': 'All your friends are already in this group',
-  'group.owner': 'Owner',
+  'group.leave': 'Leave group',
+  'group.leaveError': 'Could not leave the group',
+  'group.leaveWarningTitle': "You're the only admin",
+  'group.leaveWarningBody':
+    'Before you leave, promote another member to admin — otherwise the group will have no one managing it.',
+  'group.promoteOther': 'Promote someone else',
+  'group.cancel': 'Cancel',
+  'group.choosePromote': 'Choose who becomes admin',
 }
 
 export const translations: Record<Lang, Record<TranslationKey, string>> = { he, en }

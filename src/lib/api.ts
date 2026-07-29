@@ -330,7 +330,13 @@ export type FriendProgress = {
   totalToday: number
   streak: number
   categories: Category[]
+  /** Became friends in the last 48h — surfaces an unfamiliar join (PRD follow-up
+   *  to the permanent, auto-accept invite link: a stranger with the link
+   *  becomes a friend immediately, so a fresh join is worth calling out). */
+  recentlyJoined: boolean
 }
+
+const RECENTLY_JOINED_MS = 48 * 60 * 60 * 1000
 
 /**
  * Accepted friends with today's progress. RLS already limits this to people
@@ -340,13 +346,17 @@ export async function fetchFriends(userId: string): Promise<FriendProgress[]> {
   const links = unwrap(
     await supabase
       .from('friendships')
-      .select('user_id, friend_id')
+      .select('user_id, friend_id, responded_at')
       .eq('status', 'accepted')
       .or(`user_id.eq.${userId},friend_id.eq.${userId}`),
-  ) as { user_id: string; friend_id: string }[]
+  ) as { user_id: string; friend_id: string; responded_at: string | null }[]
 
   const friendIds = links.map((link) => (link.user_id === userId ? link.friend_id : link.user_id))
   if (friendIds.length === 0) return []
+
+  const respondedAt = new Map(
+    links.map((link) => [link.user_id === userId ? link.friend_id : link.user_id, link.responded_at]),
+  )
 
   const [profiles, goals] = await Promise.all([
     supabase.from('profiles').select('id, display_name, avatar_url').in('id', friendIds),
@@ -372,6 +382,7 @@ export async function fetchFriends(userId: string): Promise<FriendProgress[]> {
   return people.map((person) => {
     const mine = theirGoals.filter((goal) => goal.user_id === person.id)
     const done = mine.filter((goal) => doneIds.has(goal.id))
+    const joinedAt = respondedAt.get(person.id)
     return {
       id: person.id,
       displayName: person.display_name ?? '',
@@ -381,6 +392,9 @@ export async function fetchFriends(userId: string): Promise<FriendProgress[]> {
       streak: done.reduce((best, goal) => Math.max(best, doneIds.get(goal.id) ?? 0), 0),
       categories: CATEGORIES.filter((category) =>
         done.some((goal) => goal.category === category),
+      ),
+      recentlyJoined: Boolean(
+        joinedAt && Date.now() - new Date(joinedAt).getTime() < RECENTLY_JOINED_MS,
       ),
     }
   })

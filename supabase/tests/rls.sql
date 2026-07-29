@@ -776,6 +776,12 @@ begin
   raise notice 'ok: redeeming the same invite link twice is a no-op, not a duplicate';
 end $$;
 
+select assert(
+  (select count(*) from net.http_post_log
+   where body @> '{"table": "friendships"}'::jsonb) = 1,
+  'redeeming an invite link notifies the owner exactly once, not again on the idempotent re-redeem'
+);
+
 select assert_denied(
   '33333333-3333-3333-3333-333333333333',
   $$select redeem_invite(current_setting('pisga.test_token'))$$,
@@ -978,6 +984,104 @@ end $$;
 select assert(
   (select count(*) from conversation_members where conversation_id = current_setting('pisga.test_group')::uuid) = 2,
   'the owner can remove a member'
+);
+
+-- -----------------------------------------------------------------------------
+-- Multiple admins (0008) — group is currently {bob: admin, mallory: member}.
+-- -----------------------------------------------------------------------------
+
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+  perform add_group_member(current_setting('pisga.test_group')::uuid, '44444444-4444-4444-4444-444444444444');
+  reset role;
+end $$;
+
+select assert_denied(
+  '33333333-3333-3333-3333-333333333333',
+  $$select promote_group_member(current_setting('pisga.test_group')::uuid, '44444444-4444-4444-4444-444444444444')$$,
+  'a non-admin cannot promote another member to admin'
+);
+
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+  perform promote_group_member(current_setting('pisga.test_group')::uuid, '44444444-4444-4444-4444-444444444444');
+  reset role;
+end $$;
+
+select assert(
+  (select is_admin from conversation_members
+   where conversation_id = current_setting('pisga.test_group')::uuid
+     and user_id = '44444444-4444-4444-4444-444444444444'),
+  'an admin can promote a regular member to admin'
+);
+
+-- Group is now {bob: admin, mallory: member, dave: admin}.
+select assert_denied(
+  '22222222-2222-2222-2222-222222222222',
+  $$select remove_group_member(current_setting('pisga.test_group')::uuid, '44444444-4444-4444-4444-444444444444')$$,
+  'an admin cannot be removed directly, even by another admin'
+);
+
+-- Bob (admin) leaves — allowed, since dave is still an admin.
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+  perform leave_group_conversation(current_setting('pisga.test_group')::uuid);
+  reset role;
+end $$;
+
+select assert(
+  not exists (
+    select 1 from conversation_members
+    where conversation_id = current_setting('pisga.test_group')::uuid
+      and user_id = '22222222-2222-2222-2222-222222222222'
+  ),
+  'an admin can leave when another admin remains'
+);
+
+-- Group is now {mallory: member, dave: admin} — dave is the sole admin, and
+-- mallory is still there, so dave leaving would orphan the group.
+select assert_denied(
+  '44444444-4444-4444-4444-444444444444',
+  $$select leave_group_conversation(current_setting('pisga.test_group')::uuid)$$,
+  'the sole admin cannot leave while another member remains'
+);
+
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '44444444-4444-4444-4444-444444444444', true);
+  perform promote_group_member(current_setting('pisga.test_group')::uuid, '33333333-3333-3333-3333-333333333333');
+  perform leave_group_conversation(current_setting('pisga.test_group')::uuid);
+  reset role;
+end $$;
+
+select assert(
+  not exists (
+    select 1 from conversation_members
+    where conversation_id = current_setting('pisga.test_group')::uuid
+      and user_id = '44444444-4444-4444-4444-444444444444'
+  ),
+  'the sole admin can leave once another member is promoted first'
+);
+
+-- Group is now {mallory: admin} alone — leaving is fine with nobody left to orphan.
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '33333333-3333-3333-3333-333333333333', true);
+  perform leave_group_conversation(current_setting('pisga.test_group')::uuid);
+  reset role;
+end $$;
+
+select assert(
+  (select count(*) from conversation_members where conversation_id = current_setting('pisga.test_group')::uuid) = 0,
+  'the last member of a group can always leave'
 );
 
 -- -----------------------------------------------------------------------------

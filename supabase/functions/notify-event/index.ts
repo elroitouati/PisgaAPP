@@ -1,8 +1,10 @@
-// Single entry point for the three event-driven triggers wired in
+// Single entry point for the event-driven triggers wired in
 // 0007_push_notifications.sql (notify_on_badge_earned, notify_on_goal_completed,
-// notify_on_message). Each fires supabase_functions.http_request, which POSTs
-// { type, table, schema, record, old_record } — this branches on `table` and
-// decides who gets notified with what, in the recipient's own language.
+// notify_on_message) and 0008_group_admins.sql (the invite-link join,
+// called directly from redeem_invite() rather than via a table trigger — see
+// that migration for why). Each POSTs { table, record } — this branches on
+// `table` and decides who gets notified with what, in the recipient's own
+// language.
 //
 // Deploy: supabase functions deploy notify-event
 // Secrets to set (supabase secrets set ...): VAPID_PUBLIC_KEY,
@@ -18,16 +20,27 @@ const COPY: Record<Lang, {
   badge: (title: string) => PushPayload
   goal: (title: string) => PushPayload
   message: (sender: string, preview: string | null) => PushPayload
+  friendJoined: (name: string) => PushPayload
 }> = {
   he: {
     badge: (title) => ({ title: 'באדג׳ חדש!', body: `זכית ב"${title}"`, url: '/achievements' }),
     goal: (title) => ({ title: 'מטרה הושלמה', body: `סיימת את "${title}"`, url: '/profile/goals' }),
     message: (sender, preview) => ({ title: sender, body: preview ?? 'שלח/ה לך הודעה' }),
+    friendJoined: (name) => ({
+      title: 'חבר חדש!',
+      body: `${name} הצטרף/ה דרך הקישור שלך`,
+      url: '/friends',
+    }),
   },
   en: {
     badge: (title) => ({ title: 'New badge!', body: `You earned "${title}"`, url: '/achievements' }),
     goal: (title) => ({ title: 'Goal completed', body: `You finished "${title}"`, url: '/profile/goals' }),
     message: (sender, preview) => ({ title: sender, body: preview ?? 'sent you a message' }),
+    friendJoined: (name) => ({
+      title: 'New friend!',
+      body: `${name} joined through your link`,
+      url: '/friends',
+    }),
   },
 }
 
@@ -94,6 +107,19 @@ Deno.serve(async (req) => {
           url: `/chat/${conversationId}`,
         })
       }
+    }
+  } else if (table === 'friendships') {
+    const { owner_id: ownerId, joiner_id: joinerId } = record as {
+      owner_id: string
+      joiner_id: string
+    }
+    const [{ data: owner }, { data: joiner }] = await Promise.all([
+      admin.from('profiles').select('language').eq('id', ownerId).single(),
+      admin.from('profiles').select('display_name').eq('id', joinerId).single(),
+    ])
+    if (owner && joiner) {
+      const lang: Lang = owner.language === 'en' ? 'en' : 'he'
+      await sendPushToUser(admin, ownerId, COPY[lang].friendJoined(joiner.display_name ?? 'Pisga'))
     }
   }
 

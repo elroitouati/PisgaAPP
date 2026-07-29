@@ -266,7 +266,17 @@ function FriendRow({
       </span>
 
       <div className="min-w-0 flex-1">
-        <div className="text-[15px] font-semibold">{friend.displayName}</div>
+        <div className="flex items-center gap-1.5">
+          <span className="truncate text-[15px] font-semibold">{friend.displayName}</span>
+          {friend.recentlyJoined ? (
+            <span
+              style={categoryStyle('social')}
+              className="flex-none rounded-full bg-[color-mix(in_oklch,var(--cat)_16%,var(--color-surface))] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--cat)]"
+            >
+              {t('friends.recentlyJoined')}
+            </span>
+          ) : null}
+        </div>
         <div className={`mt-0.5 text-xs ${idle ? 'text-fg-subtle' : 'text-fg-muted'}`}>
           {idle
             ? t('friends.notStartedYet')

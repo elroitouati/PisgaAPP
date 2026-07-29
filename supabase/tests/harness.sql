@@ -101,3 +101,36 @@ begin
   return coalesce(new, old);
 end;
 $$;
+
+-- Minimal stand-in for pg_net (net.http_post), used directly by
+-- redeem_invite() in 0008_group_admins.sql — that call has no trigger
+-- context to log through supabase_functions.http_request, so it needs its
+-- own log table.
+create schema if not exists net;
+grant usage on schema net to anon, authenticated, service_role;
+alter default privileges in schema net grant all on tables to anon, authenticated, service_role;
+
+create table if not exists net.http_post_log (
+  id        bigint generated always as identity primary key,
+  url       text not null,
+  body      jsonb,
+  logged_at timestamptz not null default now()
+);
+
+create or replace function net.http_post(
+  url text,
+  body jsonb default '{}'::jsonb,
+  params jsonb default '{}'::jsonb,
+  headers jsonb default '{}'::jsonb,
+  timeout_milliseconds int default 5000
+)
+returns bigint
+language plpgsql
+as $$
+declare v_id bigint;
+begin
+  insert into net.http_post_log (url, body) values (url, body)
+  returning id into v_id;
+  return v_id;
+end;
+$$;

@@ -191,7 +191,7 @@ export async function unblockUser(userId: string): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
-// ── Group management (owner-only) ───────────────────────────────────────────
+// ── Group management (design 9a-9d — any admin, not a single fixed owner) ──
 
 export async function setGroupPostingMode(
   conversationId: string,
@@ -220,18 +220,39 @@ export async function removeGroupMember(conversationId: string, userId: string):
   if (error) throw new Error(error.message)
 }
 
+export async function promoteGroupMember(conversationId: string, userId: string): Promise<void> {
+  const { error } = await supabase.rpc('promote_group_member', {
+    p_conversation_id: conversationId,
+    p_user_id: userId,
+  })
+  if (error) throw new Error(error.message)
+}
+
+/**
+ * Throws with a recognizable message when the caller is the sole admin and
+ * other members remain — the caller catches that specific case to show
+ * design 9c/9d's "promote someone first" warning instead of a plain error.
+ */
+export async function leaveGroupConversation(conversationId: string): Promise<void> {
+  const { error } = await supabase.rpc('leave_group_conversation', {
+    p_conversation_id: conversationId,
+  })
+  if (error) throw new Error(error.message)
+}
+
+export type GroupMember = { id: string; isAdmin: boolean }
+
 export type ConversationDetail = {
   id: string
   kind: 'direct' | 'group' | 'challenge'
   title: string | null
-  createdBy: string
   membersCanPost: boolean
-  memberIds: string[]
+  members: GroupMember[]
 }
 
 export type MemberProfile = { id: string; display_name: string | null; avatar_url: string | null }
 
-/** Names/avatars for the group-management sheet's member list. */
+/** Names/avatars for the group-management screen's member list. */
 export async function fetchMemberProfiles(memberIds: string[]): Promise<MemberProfile[]> {
   if (memberIds.length === 0) return []
   return unwrap(
@@ -239,32 +260,33 @@ export async function fetchMemberProfiles(memberIds: string[]): Promise<MemberPr
   )
 }
 
-/** Full membership + settings for the group-management sheet. */
+/** Full membership + settings for the group-management screen. */
 export async function fetchConversationDetail(conversationId: string): Promise<ConversationDetail> {
   const [conversation, members] = await Promise.all([
     supabase
       .from('conversations')
-      .select('id, kind, title, created_by, members_can_post')
+      .select('id, kind, title, members_can_post')
       .eq('id', conversationId)
       .single(),
-    supabase.from('conversation_members').select('user_id').eq('conversation_id', conversationId),
+    supabase
+      .from('conversation_members')
+      .select('user_id, is_admin')
+      .eq('conversation_id', conversationId),
   ])
 
   const c = unwrap(conversation) as {
     id: string
     kind: 'direct' | 'group' | 'challenge'
     title: string | null
-    created_by: string
     members_can_post: boolean
   }
-  const rows = unwrap(members) as { user_id: string }[]
+  const rows = unwrap(members) as { user_id: string; is_admin: boolean }[]
 
   return {
     id: c.id,
     kind: c.kind,
     title: c.title,
-    createdBy: c.created_by,
     membersCanPost: c.members_can_post,
-    memberIds: rows.map((r) => r.user_id),
+    members: rows.map((r) => ({ id: r.user_id, isAdmin: r.is_admin })),
   }
 }
