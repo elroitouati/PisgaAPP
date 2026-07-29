@@ -78,6 +78,15 @@ insert into friendships (user_id, friend_id, status)
 values ('11111111-1111-1111-1111-111111111111',
         '22222222-2222-2222-2222-222222222222', 'accepted');
 
+-- goals_library holds real product content, not test fixtures — as of 0009
+-- it starts empty, pending the real structured-goal library. These two rows
+-- are this test file's own, so it stays correct regardless of what (if
+-- anything) product content seeds later.
+insert into goals_library (slug, title_he, title_en, category, goal_type, verification, points, sort_order)
+values
+  ('pushups-60', 'שכיבות סמיכה', 'Push-ups', 'physical', 'daily', 'guided_session', 10, 1),
+  ('water-8-cups', 'שתיית מים', 'Drink water', 'physical', 'daily', 'checkbox_reflection', 5, 2);
+
 -- Alice adopts a library goal and also writes a custom one.
 insert into user_goals (id, user_id, library_id, is_custom, title, category, goal_type, verification)
 select 'aaaa0001-0000-0000-0000-000000000001',

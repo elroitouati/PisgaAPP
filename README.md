@@ -26,6 +26,10 @@ npm run dev
    - `supabase/migrations/0006_profile_features.sql` — אווטאר, קישורי הזמנה, מחיקת חשבון, ניהול קבוצה
    - `supabase/migrations/0007_push_notifications.sql` — **לפני ההרצה**, החליפו
      בקובץ את `<PROJECT_REF>` ו‑`<WEBHOOK_SECRET>` (ראו סעיף 6 למטה) בערכים האמיתיים
+   - `supabase/migrations/0008_group_admins.sql` — כמה מנהלים בקבוצה, לא בעלים יחיד.
+     **גם כאן** יש `<PROJECT_REF>`/`<WEBHOOK_SECRET>` להחליף (טריגר הצטרפות דרך קישור)
+   - `supabase/migrations/0009_clear_goals_library.sql` — מרוקן את תוכן ספריית
+     המטרות הזמני (0002); הצוות מחליף אותו בתוכן האמיתי בנפרד
 3. ב‑Authentication → Providers: הפעילו Email והפעילו Google (עם ה‑Client ID/Secret מ‑Google Cloud).
 4. ב‑Authentication → URL Configuration: הוסיפו את `http://localhost:5173/auth/callback`
    ואת כתובת הפרודקשן ל‑Redirect URLs.
@@ -168,7 +172,9 @@ scripts/
 
 - **ערכי הנקודות** — המנגנון סגור (ערך נפרד לכל מטרה, ב‑`goals_library.points`),
   אבל המספרים עצמם הם הצעה שנעגנה ב‑"+40" שמופיע בעיצוב. לשינוי — `0004_goal_points.sql`.
-- **תוכן ספריית המטרות** — 21 מטרות כהצעה ראשונה (PRD 13).
+- **תוכן ספריית המטרות** — הטיוטה הראשונית (21 מטרות, PRD 13) נמחקה
+  ב‑`0009_clear_goals_library.sql`; הצוות מכין תוכן אמיתי (מטרות מובנות
+  מותאמות, אימות לכל מטרה) שיוחלף בו. עד אז `goals_library` ריקה בכוונה.
 - **שלושה ייחוסי ציטוט שנויים במחלוקת** — מסומנים `disputed` ב‑`src/lib/quotes.ts`
   (אריסטו/ויל דוראנט, לינקולן, ושם המחבר של הציטוט הראשון).
 - **סנכרון צעדים** — מטרות `sensor_sync` מציגות שהחיבור אינו קיים במקום לקבל דיווח עצמי.
