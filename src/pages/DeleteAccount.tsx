@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useI18n } from '@/i18n/useI18n'
 import { useAuth } from '@/providers/useAuth'
-import { requestAccountDeletion } from '@/lib/api'
+import { finishAccountDeletion, requestAccountDeletion } from '@/lib/api'
 import { BackIcon, WarningIcon } from '@/components/icons'
 import { Spinner } from '@/components/Spinner'
 
@@ -23,7 +23,13 @@ export default function DeleteAccount() {
     setError(null)
     try {
       await requestAccountDeletion()
-      await signOut()
+      await finishAccountDeletion()
+      try {
+        await signOut()
+      } catch {
+        // The account no longer exists server-side at this point, so the
+        // server half of sign-out failing is expected, not worth surfacing.
+      }
       navigate('/login', { replace: true })
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : t('delete.error'))

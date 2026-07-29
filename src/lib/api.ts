@@ -679,10 +679,21 @@ export async function exportMyData(userId: string) {
 
 /**
  * Deletes everything the client is able to (see 0006_profile_features.sql).
- * The auth.users row itself needs the service-role key and is left for a
- * server-side job — this does not sign the user out or finish the deletion.
+ * The auth.users row itself needs the service-role key and is left for
+ * finishAccountDeletion() — this does not sign the user out or finish it.
  */
 export async function requestAccountDeletion(): Promise<void> {
   const { error } = await supabase.rpc('request_account_deletion')
+  if (error) throw new Error(error.message)
+}
+
+/**
+ * Calls the `delete-account` Edge Function to remove the auth.users row
+ * itself — the one thing the client can never do with the anon key. Deleting
+ * it cascades away everything requestAccountDeletion() didn't already wipe
+ * (see the function's own comment for the cascade chain).
+ */
+export async function finishAccountDeletion(): Promise<void> {
+  const { error } = await supabase.functions.invoke('delete-account')
   if (error) throw new Error(error.message)
 }

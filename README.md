@@ -23,9 +23,18 @@ npm run dev
    - `supabase/migrations/0003_badges.sql` — באדג׳ים ולוגיקת ההענקה
    - `supabase/migrations/0004_goal_points.sql` — ערכי נקודות וחישוב הניקוד
    - `supabase/migrations/0005_chat.sql` — שיחות, הודעות וחסימות
+   - `supabase/migrations/0006_profile_features.sql` — אווטאר, קישורי הזמנה, מחיקת חשבון, ניהול קבוצה
 3. ב‑Authentication → Providers: הפעילו Email והפעילו Google (עם ה‑Client ID/Secret מ‑Google Cloud).
 4. ב‑Authentication → URL Configuration: הוסיפו את `http://localhost:5173/auth/callback`
    ואת כתובת הפרודקשן ל‑Redirect URLs.
+5. פרסו את ה‑Edge Function שמשלימה מחיקת חשבון (מוחקת את שורת `auth.users` עצמה,
+   דבר שדורש את מפתח ה‑service role ולכן לא יכול לרוץ מהדפדפן):
+   ```bash
+   supabase functions deploy delete-account --project-ref <your-project-ref>
+   ```
+   `SUPABASE_URL`/`SUPABASE_ANON_KEY`/`SUPABASE_SERVICE_ROLE_KEY` מוזרקים אוטומטית
+   לכל Edge Function — אין secrets להגדיר ידנית. אימות ה‑JWT דלוק כברירת מחדל,
+   כך שרק המשתמש המחובר יכול למחוק את עצמו.
 
 ## בדיקות
 
@@ -54,6 +63,7 @@ src/
 supabase/
   migrations/    סכמה + seed
   tests/         harness + בדיקות RLS
+  functions/     Edge Functions (service‑role, לא נגישות ללקוח)
 design/
   unpacked/      ה‑HTML של העיצוב כפי שחולץ מה‑bundle
   screens/       כל מסך בעיצוב כקובץ נפרד, לעיון מול הקוד

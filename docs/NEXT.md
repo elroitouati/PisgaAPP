@@ -1,7 +1,7 @@
 # איפה עצרנו ומה הלאה
 
 מסמך המשך. מתעדכן בכל פעם שנסגרת החלטה או נעצרת עבודה.
-עדכון אחרון: 28 ביולי 2026 (אחרי מיגרציה 0006 ומסכי הפרופיל המורחבים).
+עדכון אחרון: 29 ביולי 2026 (אחרי ה‑Edge Function למחיקת חשבון).
 
 ---
 
@@ -27,9 +27,15 @@
   `redeem_invite` כפי שהוחלט (קבוע, ללא תפוגה, הצטרפות אוטומטית). נוספה גם
   `invite_preview(token)` — פונקציית `anon` שמראה את שם המזמין **לפני** התחברות,
   למסך הנחיתה `/join/:token` (מסכים 8k-8p)
-- **מחיקת חשבון** — `account_deletion_requests` + `request_account_deletion()`
-  שמוחקת כל מה שהלקוח יכול למחוק. השורה ב‑`auth.users` עצמה נשארת ל‑Edge
-  Function עתידי עם service-role — **טרם נבנה**
+- **מחיקת חשבון — הושלם.** `account_deletion_requests` + `request_account_deletion()`
+  מוחקת כל מה שהלקוח יכול, ועכשיו `supabase/functions/delete-account` (Edge
+  Function, service-role) מוחקת גם את שורת `auth.users` עצמה. **תגלית שפישטה
+  את זה:** כל טבלה שמפנה ל‑`profiles(id)` כבר מוגדרת `on delete cascade`, אז
+  מחיקת `auth.users` מפילה את `profiles` וממנה הכול בשרשרת — אין צורך לשכפל
+  את לוגיקת הניקוי בפונקציה עצמה. `DeleteAccount.tsx` קורא לשתי הפונקציות
+  ברצף ואז מתנתק. **טרם נפרס בפועל** (`supabase functions deploy
+  delete-account`) ולא נבדק מקצה־לקצה מול פרויקט Supabase אמיתי — רק נקרא
+  קוד. שווה לבדוק את זה לפני שסומכים על הכפתור בפרודקשן.
 - **המטרות שלי / ארכוב** — `unarchive_goal()` (הכיוון החסר; archive כבר היה קיים).
   מסך 8g/8h עם טאבים פעילות/בארכיון ואתגרים משותפים פעילים
 - **ניהול קבוצה** (הוחלט: כל חבר כותב כברירת מחדל; הבעלים יכול לעבור ל"רק אני
@@ -100,8 +106,6 @@ backend של Push** (VAPID, service worker handler, Edge Functions) — זה ע�
   Push (סעיף 1), אז זה טריגר טבעי חמישי להוסיף שם
 - **סימון "הצטרפו לאחרונה"** במסך החברים, כדי שהצטרפות לא‑מוכרת תבלוט
 - **בחירה אילו מטרות מוצגות בפרופיל** — הוחלט לוותר על זה כרגע
-- Edge Function למחיקת `auth.users`/`profiles` בפועל (service‑role) — היום
-  `request_account_deletion()` מוחקת רק את מה שהלקוח יכול, ורושמת בקשה
 
 ### 3. פתוח מלפני כן
 
@@ -131,3 +135,7 @@ backend של Push** (VAPID, service worker handler, Edge Functions) — זה ע�
 - **מסך "התראות ותזכורות"** — זיהוי iOS Safari לא‑מותקן (`isIOSSafari` +
   `display-mode: standalone`) נבדק רק ב‑User-Agent מדומה; שווה לוודא על iPhone
   אמיתי גם לפני וגם אחרי התקנה למסך הבית
+- **מחיקת חשבון מקצה לקצה** — `supabase/functions/delete-account` נכתבה ונקראה,
+  אבל לא פורסה ולא רצה מול פרויקט Supabase אמיתי. לפני שסומכים על הכפתור:
+  לפרוס (`supabase functions deploy delete-account`), ליצור משתמש בדיקה,
+  ללחוץ מחיקה, ולוודא שגם שורת ה‑`auth.users` וגם `profiles` נעלמות בפועל
