@@ -74,3 +74,30 @@ immutable
 as $$
   select string_to_array(name, '/');
 $$;
+
+-- Minimal stand-in for the Dashboard's Database Webhooks trigger function
+-- (supabase_functions.http_request), used by 0007_push_notifications.sql. The
+-- real one fires an async HTTP POST via pg_net; this just logs that it would
+-- have, so tests can assert a trigger fired without a live Edge Function.
+create schema if not exists supabase_functions;
+grant usage on schema supabase_functions to anon, authenticated, service_role;
+alter default privileges in schema supabase_functions grant all on tables to anon, authenticated, service_role;
+
+create table if not exists supabase_functions.http_request_log (
+  id         uuid primary key default gen_random_uuid(),
+  url        text not null,
+  table_name text not null,
+  op         text not null,
+  logged_at  timestamptz not null default now()
+);
+
+create or replace function supabase_functions.http_request()
+returns trigger
+language plpgsql
+as $$
+begin
+  insert into supabase_functions.http_request_log (url, table_name, op)
+  values (TG_ARGV[0], TG_TABLE_NAME, TG_OP);
+  return coalesce(new, old);
+end;
+$$;

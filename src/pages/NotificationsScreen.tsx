@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useI18n } from '@/i18n/useI18n'
+import { useAuth } from '@/providers/useAuth'
 import { categoryStyle } from '@/lib/categories'
+import { currentPushSubscription, pushSupported, subscribeToPush } from '@/lib/push'
 import { BackIcon, BellIcon, DownloadIcon, ShareMoreIcon } from '@/components/icons'
 import { PrimaryButton } from '@/components/ui'
+import { Spinner } from '@/components/Spinner'
 
 function isIOSSafari() {
   const ua = navigator.userAgent
@@ -17,29 +20,50 @@ function isStandalone() {
   )
 }
 
+type Status = 'checking' | 'unsupported' | 'denied' | 'subscribed' | 'ready'
+
 /**
  * Designs 8i (dark) / 8j (light) for the iOS "add to home screen" explainer,
- * plus a plain permission request for every other platform. The push
- * delivery backend (VAPID, service worker handler, Edge Functions) is a
- * separate, not-yet-built piece — this screen only gets consent, which the
- * platform requires before any of that can matter.
+ * plus a real subscribe flow for every other platform: request permission,
+ * subscribe this browser, save the subscription (supabase/functions/ sends
+ * to it once a badge/goal/message/reminder event fires).
  */
 export default function NotificationsScreen() {
   const { t } = useI18n()
+  const { user } = useAuth()
   const navigate = useNavigate()
-  const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>(
-    'Notification' in window ? Notification.permission : 'unsupported',
-  )
+  const [status, setStatus] = useState<Status>('checking')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const needsIOSInstall = isIOSSafari() && !isStandalone()
 
   useEffect(() => {
-    if ('Notification' in window) setPermission(Notification.permission)
+    let active = true
+    async function check() {
+      if (!pushSupported()) return active && setStatus('unsupported')
+      if (Notification.permission === 'denied') return active && setStatus('denied')
+      const existing = await currentPushSubscription()
+      if (active) setStatus(existing ? 'subscribed' : 'ready')
+    }
+    void check()
+    return () => {
+      active = false
+    }
   }, [])
 
-  async function requestPermission() {
-    if (!('Notification' in window)) return
-    const result = await Notification.requestPermission()
-    setPermission(result)
+  async function enable() {
+    if (!user) return
+    setBusy(true)
+    setError(null)
+    try {
+      await subscribeToPush(user.id)
+      setStatus('subscribed')
+    } catch (caught) {
+      setStatus(Notification.permission === 'denied' ? 'denied' : 'ready')
+      setError(caught instanceof Error ? caught.message : t('push.enableButton'))
+    } finally {
+      setBusy(false)
+    }
   }
 
   if (needsIOSInstall) {
@@ -106,15 +130,24 @@ export default function NotificationsScreen() {
           </p>
         </div>
 
-        {permission === 'granted' ? (
-          <p style={categoryStyle('physical')} className="text-sm font-semibold text-[var(--cat)]">{t('push.enabled')}</p>
-        ) : permission === 'denied' ? (
+        {status === 'subscribed' ? (
+          <p style={categoryStyle('physical')} className="text-sm font-semibold text-[var(--cat)]">
+            {t('push.enabled')}
+          </p>
+        ) : status === 'denied' ? (
           <p className="text-fg-subtle text-[13px]">{t('push.denied')}</p>
-        ) : permission === 'unsupported' ? null : (
-          <PrimaryButton className="w-full" onClick={() => void requestPermission()}>
+        ) : status === 'unsupported' || status === 'checking' ? null : (
+          <PrimaryButton className="w-full" disabled={busy} onClick={() => void enable()}>
+            {busy ? <Spinner className="border-on-brand/30 border-t-on-brand" /> : null}
             {t('push.enableButton')}
           </PrimaryButton>
         )}
+
+        {error ? (
+          <p role="alert" className="text-danger text-xs">
+            {error}
+          </p>
+        ) : null}
       </div>
     </main>
   )

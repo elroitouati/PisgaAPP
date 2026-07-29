@@ -24,6 +24,8 @@ npm run dev
    - `supabase/migrations/0004_goal_points.sql` — ערכי נקודות וחישוב הניקוד
    - `supabase/migrations/0005_chat.sql` — שיחות, הודעות וחסימות
    - `supabase/migrations/0006_profile_features.sql` — אווטאר, קישורי הזמנה, מחיקת חשבון, ניהול קבוצה
+   - `supabase/migrations/0007_push_notifications.sql` — **לפני ההרצה**, החליפו
+     בקובץ את `<PROJECT_REF>` ו‑`<WEBHOOK_SECRET>` (ראו סעיף 6 למטה) בערכים האמיתיים
 3. ב‑Authentication → Providers: הפעילו Email והפעילו Google (עם ה‑Client ID/Secret מ‑Google Cloud).
 4. ב‑Authentication → URL Configuration: הוסיפו את `http://localhost:5173/auth/callback`
    ואת כתובת הפרודקשן ל‑Redirect URLs.
@@ -35,12 +37,43 @@ npm run dev
    `SUPABASE_URL`/`SUPABASE_ANON_KEY`/`SUPABASE_SERVICE_ROLE_KEY` מוזרקים אוטומטית
    לכל Edge Function — אין secrets להגדיר ידנית. אימות ה‑JWT דלוק כברירת מחדל,
    כך שרק המשתמש המחובר יכול למחוק את עצמו.
+6. **התראות Push** — כמה שלבים, כי זה הפיצ׳ר עם הכי הרבה חלקים נעים:
+
+   a. **מפתחות VAPID** — זוג מפתחות לזיהוי השרת מול שירות ה‑Push של הדפדפן:
+      ```bash
+      npx web-push generate-vapid-keys
+      ```
+      את המפתח הציבורי שימו ב‑`VITE_VAPID_PUBLIC_KEY` (ב‑`.env.local`, ובכל
+      פלטפורמת אחסון של הפרודקשן). את המפתח הפרטי **לעולם לא** בקוד — רק כ‑secret:
+      ```bash
+      supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... \
+        VAPID_SUBJECT=mailto:you@example.com \
+        WEBHOOK_SECRET=$(openssl rand -hex 32)
+      ```
+      את אותו `WEBHOOK_SECRET` צריך גם בתוך `0007_push_notifications.sql`
+      (הטריגרים בודקים אותו לפני שהם סומכים על הבקשה).
+
+   b. **פריסת הפונקציות**:
+      ```bash
+      supabase functions deploy notify-event --project-ref <your-project-ref>
+      supabase functions deploy notify-forgotten-goals --project-ref <your-project-ref>
+      ```
+
+   c. **מילוי ה‑placeholders במיגרציה** — `<PROJECT_REF>` בכתובת ה‑URL של כל
+      טריגר, ו‑`<WEBHOOK_SECRET>` בכותרת. אלה שלוש הפעולות (באדג׳, מטרה
+      הושלמה, הודעה) שקוראות ל‑`notify-event` ישירות דרך trigger על הטבלה.
+
+   d. **התזכורת היומית** ("כמעט שכחת") היא לא webhook על טבלה — היא ריצה
+      מתוזמנת. הגדירו Cron Trigger מה‑Dashboard (Integrations → Cron) שקורא
+      פעם ביום ל‑`notify-forgotten-goals`, עם הכותרת
+      `x-webhook-secret: <WEBHOOK_SECRET>`. שימו לב: היא רצה בשעה קבועה
+      ב‑UTC לכולם — אין עדיין אזור זמן פר‑משתמש (ראו `docs/NEXT.md`).
 
 ## בדיקות
 
 ```bash
 npm run build                  # typecheck + build
-./scripts/verify-sql.sh        # מיגרציות + 50 בדיקות RLS, באדג׳ים ונקודות על Postgres זמני
+./scripts/verify-sql.sh        # מיגרציות + 105 בדיקות RLS, באדג׳ים, נקודות והתראות על Postgres זמני
 ```
 
 `verify-sql.sh` דורש Postgres מקומי; העבירו לו `PGHOST`/`PGPORT`/`PGUSER`.
@@ -55,15 +88,17 @@ src/
   providers/     Auth, Profile, Theme
   hooks/         useGoals (מעקב יומי), useGuidedSession (טיימר), useBadges,
                  usePoints, useAsync
-  lib/           supabase, api (שאילתות), categories, scoring, dates, quotes
+  lib/           supabase, api (שאילתות), categories, scoring, dates, quotes, push
   components/    ui, icons, GoalRow, BottomNav, AppShell
   pages/         Login, Onboarding, Home, CategoryScreen, GuidedSession,
                  Library, Achievements, Calendar, Friends, Chat, SharedGoal,
-                 Profile
+                 Profile ותת־המסכים שלו
+  sw.ts          Service Worker בכתב יד (injectManifest) — push + notificationclick
 supabase/
   migrations/    סכמה + seed
   tests/         harness + בדיקות RLS
-  functions/     Edge Functions (service‑role, לא נגישות ללקוח)
+  functions/     Edge Functions (service‑role, לא נגישות ללקוח):
+                 delete-account, notify-event, notify-forgotten-goals, _shared
 design/
   unpacked/      ה‑HTML של העיצוב כפי שחולץ מה‑bundle
   screens/       כל מסך בעיצוב כקובץ נפרד, לעיון מול הקוד

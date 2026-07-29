@@ -697,3 +697,31 @@ export async function finishAccountDeletion(): Promise<void> {
   const { error } = await supabase.functions.invoke('delete-account')
   if (error) throw new Error(error.message)
 }
+
+// ── Push notifications ──────────────────────────────────────────────────
+
+/**
+ * Records one browser/device subscription. Keyed by endpoint (unique per
+ * registration), so re-subscribing the same browser updates the row instead
+ * of duplicating it.
+ */
+export async function savePushSubscription(
+  userId: string,
+  subscription: { endpoint: string; keys: { p256dh: string; auth: string } },
+): Promise<void> {
+  const { error } = await supabase.from('push_subscriptions').upsert(
+    {
+      user_id: userId,
+      endpoint: subscription.endpoint,
+      p256dh: subscription.keys.p256dh,
+      auth: subscription.keys.auth,
+    },
+    { onConflict: 'endpoint' },
+  )
+  if (error) throw new Error(error.message)
+}
+
+export async function deletePushSubscription(endpoint: string): Promise<void> {
+  const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint)
+  if (error) throw new Error(error.message)
+}

@@ -1044,4 +1044,157 @@ select assert_denied(
   'a user cannot unarchive someone else''s goal'
 );
 
+-- -----------------------------------------------------------------------------
+-- Push notifications (0007)
+-- -----------------------------------------------------------------------------
+
+select assert_denied(
+  '11111111-1111-1111-1111-111111111111',
+  $$insert into push_subscriptions (user_id, endpoint, p256dh, auth)
+    values ('33333333-3333-3333-3333-333333333333', 'https://push.example/x', 'p', 'a')$$,
+  'a user cannot create a push subscription for someone else'
+);
+
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  insert into push_subscriptions (user_id, endpoint, p256dh, auth)
+  values ('11111111-1111-1111-1111-111111111111', 'https://push.example/alice', 'p', 'a');
+  reset role;
+end $$;
+
+select assert(
+  (select count(*) from push_subscriptions where user_id = '11111111-1111-1111-1111-111111111111') = 1,
+  'a user can create their own push subscription'
+);
+
+do $$
+declare v_seen int;
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '33333333-3333-3333-3333-333333333333', true);
+  select count(*) into v_seen from push_subscriptions where user_id = '11111111-1111-1111-1111-111111111111';
+  reset role;
+  if v_seen <> 0 then
+    raise exception 'FAILED: another user could read someone else''s push subscription';
+  end if;
+  raise notice 'ok: a user cannot read someone else''s push subscription';
+end $$;
+
+select assert_no_rows_affected(
+  '33333333-3333-3333-3333-333333333333',
+  $$delete from push_subscriptions where user_id = '11111111-1111-1111-1111-111111111111'$$,
+  'a user cannot delete someone else''s push subscription'
+);
+
+select assert_denied(
+  '11111111-1111-1111-1111-111111111111',
+  $$select * from goals_missed_today()$$,
+  'goals_missed_today is not callable by an ordinary authenticated user'
+);
+
+-- A fresh, isolated pair — anyone reused this late in the file may already
+-- carry block/deletion history from earlier sections (see the group-
+-- management and account-deletion notes above).
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('55555555-5555-5555-5555-555555555555', 'erin@example.com',  '{"full_name": "Erin"}'),
+  ('66666666-6666-6666-6666-666666666666', 'frank@example.com', '{"full_name": "Frank"}');
+insert into friendships (user_id, friend_id, status)
+values ('55555555-5555-5555-5555-555555555555',
+        '66666666-6666-6666-6666-666666666666', 'accepted');
+
+-- A daily goal with an intact 3‑day streak as of yesterday, and nothing
+-- logged yet today — exactly what goals_missed_today() should surface.
+insert into user_goals (id, user_id, is_custom, title, category, goal_type, verification)
+values ('99990001-0000-0000-0000-000000000001', '55555555-5555-5555-5555-555555555555',
+        true, 'Evening stretch', 'physical', 'daily', 'daily_checkin');
+insert into goal_completions (user_goal_id, completed_date, current_streak)
+values ('99990001-0000-0000-0000-000000000001', current_date - 1, 3);
+
+select assert(
+  exists (
+    select 1 from goals_missed_today()
+    where user_goal_id = '99990001-0000-0000-0000-000000000001'
+  ),
+  'goals_missed_today surfaces a goal with an intact streak and no completion today'
+);
+
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '55555555-5555-5555-5555-555555555555', true);
+  perform record_goal_completion('99990001-0000-0000-0000-000000000001');
+  reset role;
+end $$;
+
+select assert(
+  not exists (
+    select 1 from goals_missed_today()
+    where user_goal_id = '99990001-0000-0000-0000-000000000001'
+  ),
+  'goals_missed_today drops a goal once it is completed today'
+);
+
+do $$
+declare v_conversation uuid; v_message uuid;
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '55555555-5555-5555-5555-555555555555', true);
+  select id into v_conversation from open_direct_conversation('66666666-6666-6666-6666-666666666666');
+  select id into v_message from send_message(v_conversation, 'hello frank');
+  reset role;
+  perform set_config('pisga.test_conversation', v_conversation::text, false);
+  perform set_config('pisga.test_message', v_message::text, false);
+end $$;
+
+select assert(
+  (select array_agg(recipient) from notification_recipients_for_message(
+    current_setting('pisga.test_message')::uuid
+  ) as recipient) = array['66666666-6666-6666-6666-666666666666'::uuid],
+  'a message notifies the other conversation member, not the sender'
+);
+
+select assert_denied(
+  '55555555-5555-5555-5555-555555555555',
+  $$select * from notification_recipients_for_message(current_setting('pisga.test_message')::uuid)$$,
+  'notification_recipients_for_message is not callable by an ordinary authenticated user'
+);
+
+select assert(
+  exists (
+    select 1 from supabase_functions.http_request_log
+    where table_name = 'messages'
+  ),
+  'sending a message fires the notify_on_message webhook trigger'
+);
+
+select assert(
+  exists (
+    select 1 from supabase_functions.http_request_log
+    where table_name = 'user_badges'
+  ),
+  'earning a badge fires the notify_on_badge_earned webhook trigger'
+);
+
+insert into user_goals (id, user_id, is_custom, title, category, goal_type, verification, target_date)
+values ('99990002-0000-0000-0000-000000000002', '55555555-5555-5555-5555-555555555555',
+        true, 'Read a book', 'academic', 'deadline', 'checkbox_reflection', current_date + 7);
+
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '55555555-5555-5555-5555-555555555555', true);
+  perform finish_goal('99990002-0000-0000-0000-000000000002');
+  reset role;
+end $$;
+
+select assert(
+  exists (
+    select 1 from supabase_functions.http_request_log
+    where table_name = 'user_goals'
+  ),
+  'finishing a deadline goal fires the notify_on_goal_completed webhook trigger'
+);
+
 \echo 'all RLS tests passed'

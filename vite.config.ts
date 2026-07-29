@@ -11,6 +11,16 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
+      // injectManifest (a hand-written service worker) rather than
+      // generateSW: push notifications need a `push` and a
+      // `notificationclick` listener, which generateSW's auto-built worker
+      // has no hook for.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+      },
       manifest: {
         name: 'פסגה',
         short_name: 'פסגה',
@@ -35,11 +45,6 @@ export default defineConfig({
             purpose: 'maskable',
           },
         ],
-      },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        // Supabase responses are user-specific and auth-gated — never serve them from the SW cache.
-        navigateFallbackDenylist: [/^\/auth\//],
       },
       devOptions: { enabled: false },
     }),

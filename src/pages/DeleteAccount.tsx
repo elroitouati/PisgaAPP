@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useI18n } from '@/i18n/useI18n'
 import { useAuth } from '@/providers/useAuth'
 import { finishAccountDeletion, requestAccountDeletion } from '@/lib/api'
+import { unsubscribeFromPush } from '@/lib/push'
 import { BackIcon, WarningIcon } from '@/components/icons'
 import { Spinner } from '@/components/Spinner'
 
@@ -25,10 +26,14 @@ export default function DeleteAccount() {
       await requestAccountDeletion()
       await finishAccountDeletion()
       try {
+        // The DB row is already gone via cascade, but the browser's own push
+        // registration isn't — worth clearing so this device doesn't keep a
+        // subscription for an account that no longer exists.
+        await unsubscribeFromPush()
         await signOut()
       } catch {
-        // The account no longer exists server-side at this point, so the
-        // server half of sign-out failing is expected, not worth surfacing.
+        // The account no longer exists server-side at this point, so either
+        // of these failing is expected, not worth surfacing.
       }
       navigate('/login', { replace: true })
     } catch (caught) {
