@@ -320,6 +320,74 @@ export async function fetchMonth(userId: string, year: number, month: number) {
   return days
 }
 
+// ── Calendar timeline (PRD 6.5, design 10a-10d) ─────────────────────────────
+
+export type TimelineGoal = {
+  id: string
+  title: string
+  category: Category
+  addedAt: string
+  targetDate: string
+  /** Fraction of the way from added_at to target_date, clamped to [0, 1]. */
+  progress: number
+  daysLeft: number
+  /**
+   * Five checkpoints evenly spaced across the goal's whole span (including
+   * the start and target dates themselves). There is no user-facing concept
+   * of an individual milestone anywhere in the app yet — no way to name one,
+   * no way to tap one done — so rather than half-build that, this treats
+   * "milestone" purely as a time-based reading of progress. `goal_milestones`
+   * (schema, unused) is a real per-milestone table for if that ever changes.
+   */
+  checkpointsReached: number
+  checkpointsTotal: number
+}
+
+const TIMELINE_CHECKPOINTS = 5
+
+/**
+ * Active goals with a target date — the "long-term" tab of the calendar.
+ * Ordered by nearest deadline first, matching the design.
+ */
+export async function fetchLongTermGoals(userId: string): Promise<TimelineGoal[]> {
+  const goals = unwrap(
+    await supabase
+      .from('user_goals')
+      .select('id, title, category, added_at, target_date')
+      .eq('user_id', userId)
+      .eq('active', true)
+      .in('goal_type', ['deadline', 'long_term'])
+      .not('target_date', 'is', null)
+      .order('target_date', { ascending: true }),
+  ) as { id: string; title: string; category: Category; added_at: string; target_date: string }[]
+
+  const now = Date.now()
+
+  return goals.map((goal) => {
+    const start = new Date(goal.added_at).getTime()
+    const target = new Date(goal.target_date).getTime()
+    const span = Math.max(target - start, 1)
+    const progress = Math.min(1, Math.max(0, (now - start) / span))
+    const daysLeft = Math.max(0, Math.ceil((target - now) / 86_400_000))
+    // A checkpoint counts as reached only once progress has actually passed
+    // it — floor, not round, or a goal at 40% would falsely show its 50%
+    // checkpoint as already hit.
+    const checkpointsReached = Math.floor(progress * (TIMELINE_CHECKPOINTS - 1)) + 1
+
+    return {
+      id: goal.id,
+      title: goal.title,
+      category: goal.category,
+      addedAt: goal.added_at,
+      targetDate: goal.target_date,
+      progress,
+      daysLeft,
+      checkpointsReached: Math.min(TIMELINE_CHECKPOINTS, checkpointsReached),
+      checkpointsTotal: TIMELINE_CHECKPOINTS,
+    }
+  })
+}
+
 // ── Friends (PRD 6.7, design 5e / 2e) ────────────────────────────────────────
 
 export type FriendProgress = {

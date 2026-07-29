@@ -1,27 +1,27 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useI18n } from '@/i18n/useI18n'
 import { useAuth } from '@/providers/useAuth'
 import { useAsync } from '@/hooks/useAsync'
-import { fetchMonth, type CalendarDay } from '@/lib/api'
+import { fetchLongTermGoals, fetchMonth, type CalendarDay, type TimelineGoal } from '@/lib/api'
 import { CATEGORIES, CATEGORY_META, categoryStyle } from '@/lib/categories'
 import { toDateKey, todayKey } from '@/lib/dates'
 import { BackIcon, CheckIcon, SummitIcon } from '@/components/icons'
 import { Card, EmptyState, ErrorState, SectionLabel } from '@/components/ui'
 import { Spinner } from '@/components/Spinner'
 
+type View = 'month' | 'timeline'
+
 /**
- * Designs 6b (light) and 6a (dark) — the same screen in both palettes, so it is
- * built once and the theme tokens do the rest.
- *
- * PRD 6.5 asks the calendar to also show deadline and long-term goals on a
- * timeline. The handoff only draws the daily-completion grid, so that is what
- * this is; the timeline needs a design before it can be built.
+ * Designs 6b (light) and 6a (dark) for the monthly grid, and 10a-10d for the
+ * "long-term goals" timeline tab added later — a progress bar per goal with a
+ * target date, not another list of what was done.
  */
 export default function Calendar() {
   const { t, lang } = useI18n()
   const { user } = useAuth()
 
+  const [view, setView] = useState<View>('month')
   const [cursor, setCursor] = useState(() => {
     const now = new Date()
     return { year: now.getFullYear(), month: now.getMonth() }
@@ -30,10 +30,15 @@ export default function Calendar() {
 
   const { data, loading, error, reload } = useAsync<Map<string, CalendarDay>>(
     () =>
-      user
+      user && view === 'month'
         ? fetchMonth(user.id, cursor.year, cursor.month)
         : Promise.resolve(new Map<string, CalendarDay>()),
-    [user?.id, cursor.year, cursor.month],
+    [user?.id, cursor.year, cursor.month, view],
+  )
+
+  const timeline = useAsync<TimelineGoal[]>(
+    () => (user && view === 'timeline' ? fetchLongTermGoals(user.id) : Promise.resolve([])),
+    [user?.id, view],
   )
 
   const days = useMemo(() => data ?? new Map<string, CalendarDay>(), [data])
@@ -81,31 +86,51 @@ export default function Calendar() {
         <p className="text-fg-muted mt-1 text-[13px]">{t('calendar.sub')}</p>
       </div>
 
-      <Card className="mt-4 flex items-center justify-between px-3.5 py-2.5">
-        <button
-          type="button"
-          onClick={() => step(-1)}
-          aria-label={t('calendar.prevMonth')}
-          className="text-fg-muted"
-        >
-          <BackIcon size={18} />
-        </button>
-        <span className="text-[15px] font-semibold">
-          {new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(
-            new Date(cursor.year, cursor.month, 1),
-          )}
-        </span>
-        <button
-          type="button"
-          onClick={() => step(1)}
-          aria-label={t('calendar.nextMonth')}
-          className="text-fg-muted rotate-180"
-        >
-          <BackIcon size={18} />
-        </button>
-      </Card>
+      <div className="border-line bg-surface mt-4 flex flex-shrink-0 rounded-[14px] border p-1">
+        {(['month', 'timeline'] as View[]).map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => setView(option)}
+            aria-pressed={view === option}
+            className={`flex-1 rounded-[11px] py-2.5 text-center text-[13.5px] font-semibold ${
+              view === option ? 'bg-surface-raised' : 'text-fg-muted'
+            }`}
+          >
+            {t(option === 'month' ? 'calendar.viewMonth' : 'calendar.viewTimeline')}
+          </button>
+        ))}
+      </div>
 
-      {loading ? (
+      {view === 'timeline' ? (
+        <TimelineView goals={timeline.data ?? []} loading={timeline.loading} />
+      ) : (
+        <>
+          <Card className="mt-4 flex items-center justify-between px-3.5 py-2.5">
+            <button
+              type="button"
+              onClick={() => step(-1)}
+              aria-label={t('calendar.prevMonth')}
+              className="text-fg-muted"
+            >
+              <BackIcon size={18} />
+            </button>
+            <span className="text-[15px] font-semibold">
+              {new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(
+                new Date(cursor.year, cursor.month, 1),
+              )}
+            </span>
+            <button
+              type="button"
+              onClick={() => step(1)}
+              aria-label={t('calendar.nextMonth')}
+              className="text-fg-muted rotate-180"
+            >
+              <BackIcon size={18} />
+            </button>
+          </Card>
+
+          {loading ? (
         <div className="flex justify-center py-10">
           <Spinner className="size-7" />
         </div>
@@ -199,8 +224,131 @@ export default function Calendar() {
           </div>
         </>
       )}
+        </>
+      )}
     </>
   )
+}
+
+function TimelineView({ goals, loading }: { goals: TimelineGoal[]; loading: boolean }) {
+  const { t, lang } = useI18n()
+  const navigate = useNavigate()
+  const locale = lang === 'he' ? 'he-IL' : 'en-US'
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-10">
+        <Spinner className="size-7" />
+      </div>
+    )
+  }
+
+  if (goals.length === 0) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 py-10 text-center">
+        <div className="border-line bg-surface text-fg-subtle flex size-15 items-center justify-center rounded-full border">
+          <BackIcon size={27} className="rotate-90" />
+        </div>
+        <div>
+          <div className="text-[16.5px] font-bold">{t('calendar.timelineEmptyTitle')}</div>
+          <p className="text-fg-muted mx-auto mt-2 max-w-[250px] text-[13px] leading-relaxed">
+            {t('calendar.timelineEmptyBody')}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate('/library?new=1&longTerm=1')}
+          className="bg-brand text-on-brand mt-1.5 h-12 rounded-[14px] px-[22px] text-[14.5px] font-bold"
+        >
+          {t('calendar.createLongTerm')}
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-4.5">
+      <div className="mb-2.5">
+        <SectionLabel>{t('calendar.timelineSectionLabel')}</SectionLabel>
+      </div>
+      <div className="flex flex-col gap-3">
+        {goals.map((goal) => {
+          const pct = Math.round(goal.progress * 100)
+          return (
+            <div
+              key={goal.id}
+              style={categoryStyle(goal.category)}
+              className="rounded-[16px] border border-[color-mix(in_oklch,var(--cat)_26%,var(--color-line))] bg-[color-mix(in_oklch,var(--cat)_8%,var(--color-surface))] p-[16px_17px]"
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="flex-none text-[var(--cat)]">
+                  <CategoryIcon category={goal.category} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[15px] font-semibold">{goal.title}</div>
+                  <div className="text-fg-muted mt-px text-xs">
+                    {t(CATEGORY_META[goal.category].labelKey)} ·{' '}
+                    {new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long' }).format(
+                      new Date(goal.targetDate),
+                    )}
+                  </div>
+                </div>
+                <span className="flex-none text-[13px] font-bold text-[var(--cat)]">{pct}%</span>
+              </div>
+
+              <div className="relative mt-4 h-[22px]">
+                <div className="bg-line absolute inset-x-0 top-[9px] h-1 rounded-full" />
+                <div
+                  className="absolute top-[9px] h-1 rounded-full bg-[var(--cat)] start-0"
+                  style={{ width: `${pct}%` }}
+                />
+                {Array.from({ length: goal.checkpointsTotal }, (_, i) => {
+                  const position = (i / (goal.checkpointsTotal - 1)) * 100
+                  const reached = i < goal.checkpointsReached
+                  const isToday = i === goal.checkpointsReached - 1 && pct < 100
+                  return (
+                    <span
+                      key={i}
+                      className={`absolute top-0.5 size-[9px] rounded-full ${
+                        reached ? 'bg-[var(--cat)]' : 'border-line border-[1.6px] bg-bg'
+                      } ${isToday ? 'border-surface border-2' : ''}`}
+                      style={{ [lang === 'he' ? 'right' : 'left']: `${position}%` }}
+                    />
+                  )
+                })}
+              </div>
+
+              <div className="text-fg-subtle mt-0.5 flex justify-between text-[11px]">
+                <span>
+                  {new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'numeric' }).format(
+                    new Date(goal.addedAt),
+                  )}{' '}
+                  · {t('calendar.timelineStart')}
+                </span>
+                <span>{t('calendar.timelineToday')}</span>
+                <span>
+                  {new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'numeric' }).format(
+                    new Date(goal.targetDate),
+                  )}{' '}
+                  · {t('calendar.timelineTarget')}
+                </span>
+              </div>
+
+              <div className="text-fg-muted mt-2.5 text-xs">
+                {goal.daysLeft} {t('calendar.timelineDaysLeft')} · {goal.checkpointsReached}{' '}
+                {t('common.of')} {goal.checkpointsTotal} {t('calendar.timelineCheckpoints')}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function CategoryIcon({ category }: { category: TimelineGoal['category'] }) {
+  const Icon = CATEGORY_META[category].icon
+  return <Icon size={20} />
 }
 
 function DayEntry({ entry }: { entry: CalendarDay['entries'][number] }) {

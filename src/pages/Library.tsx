@@ -5,6 +5,7 @@ import { useAuth } from '@/providers/useAuth'
 import { useAsync } from '@/hooks/useAsync'
 import { adoptLibraryGoal, createCustomGoal, fetchLibrary, fetchTrackedGoals } from '@/lib/api'
 import { CATEGORIES, CATEGORY_META, categoryStyle, type Category } from '@/lib/categories'
+import { todayKey } from '@/lib/dates'
 import { BackIcon, CheckIcon, PlusIcon } from '@/components/icons'
 import { Card, CategoryTile, ErrorState, PrimaryButton, SectionLabel } from '@/components/ui'
 import { Spinner } from '@/components/Spinner'
@@ -22,9 +23,11 @@ export default function Library() {
   const [tab, setTab] = useState<Category>('physical')
   const [adopting, setAdopting] = useState<string | null>(null)
   const [adopted, setAdopted] = useState<Set<string>>(new Set())
-  // The sheet's "your own goal" choice lands here with the form already open.
+  // The sheet's "your own goal" choice lands here with the form already open;
+  // the calendar timeline's empty-state CTA additionally pre-selects "long term".
   const [params] = useSearchParams()
   const [showCustom, setShowCustom] = useState(params.get('new') === '1')
+  const defaultLongTerm = params.get('longTerm') === '1'
 
   const library = useAsync<LibraryGoal[]>(() => fetchLibrary(), [])
   const mine = useAsync(
@@ -146,6 +149,7 @@ export default function Library() {
       {showCustom ? (
         <CustomGoalForm
           category={tab}
+          defaultLongTerm={defaultLongTerm}
           onCancel={() => setShowCustom(false)}
           onCreated={() => {
             setShowCustom(false)
@@ -168,10 +172,12 @@ export default function Library() {
 
 function CustomGoalForm({
   category,
+  defaultLongTerm = false,
   onCancel,
   onCreated,
 }: {
   category: Category
+  defaultLongTerm?: boolean
   onCancel: () => void
   onCreated: () => void
 }) {
@@ -179,20 +185,25 @@ function CustomGoalForm({
   const { user } = useAuth()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [longTerm, setLongTerm] = useState(defaultLongTerm)
+  const [targetDate, setTargetDate] = useState('')
   const [saving, setSaving] = useState(false)
+
+  const ready = title.trim() !== '' && (!longTerm || targetDate !== '')
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
-    if (!user || title.trim() === '') return
+    if (!user || !ready) return
     setSaving(true)
     try {
       await createCustomGoal(user.id, {
         title: title.trim(),
         description: description.trim() || null,
         category,
-        goal_type: 'daily',
+        goal_type: longTerm ? 'deadline' : 'daily',
         // PRD 6.4: checkbox + reflection is the default for personal goals.
         verification: 'checkbox_reflection',
+        target_date: longTerm ? targetDate : null,
       })
       onCreated()
     } finally {
@@ -215,6 +226,35 @@ function CustomGoalForm({
         rows={2}
         className="border-line bg-bg focus:border-fg resize-none rounded-xl border px-3 py-2.5 text-sm outline-none"
       />
+      <button
+        type="button"
+        role="switch"
+        aria-checked={longTerm}
+        onClick={() => setLongTerm((prev) => !prev)}
+        className="flex items-center justify-between text-start"
+      >
+        <span className="text-fg-muted text-xs font-medium">{t('goals.longTerm')}</span>
+        <span
+          className={`relative h-[24px] w-[42px] flex-none rounded-full transition-colors ${
+            longTerm ? 'bg-fg' : 'bg-line'
+          }`}
+        >
+          <span
+            className={`absolute top-[3px] size-[18px] rounded-full transition-all ${
+              longTerm ? 'bg-bg end-[3px]' : 'bg-fg-muted start-[3px]'
+            }`}
+          />
+        </span>
+      </button>
+      {longTerm ? (
+        <input
+          type="date"
+          value={targetDate}
+          onChange={(event) => setTargetDate(event.target.value)}
+          min={todayKey()}
+          className="border-line bg-bg focus:border-fg rounded-xl border px-3 py-2.5 text-sm outline-none"
+        />
+      ) : null}
       <div className="flex gap-2">
         <button
           type="button"
@@ -223,7 +263,7 @@ function CustomGoalForm({
         >
           {t('common.cancel')}
         </button>
-        <PrimaryButton type="submit" disabled={saving || title.trim() === ''} className="h-11 flex-1">
+        <PrimaryButton type="submit" disabled={saving || !ready} className="h-11 flex-1">
           {t('common.save')}
         </PrimaryButton>
       </div>
