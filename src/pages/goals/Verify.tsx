@@ -14,6 +14,15 @@ import {
 } from '@/lib/structuredGoals'
 import { BackIcon, CameraIcon, UploadIcon } from '@/components/icons'
 import { formatValue } from '@/lib/formatValue'
+import {
+  connectHealthSource,
+  fetchHealthSource,
+  isHealthSyncAvailable,
+  requestHealthPermissions,
+  syncHealthGoals,
+  UNSUPPORTED_SENSOR_GOALS,
+  type HealthSourceRow,
+} from '@/lib/health'
 import { Spinner } from '@/components/Spinner'
 import { PrimaryButton } from '@/components/ui'
 
@@ -337,13 +346,38 @@ function SensorScreen({
   onFallback,
 }: ScreenProps & { onFallback: (code: VerificationCode) => void }) {
   const { t } = useI18n()
+  const navigate = useNavigate()
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState<string | null>(null)
+
+  // Native only. In the browser there is no path to Apple Health or Health
+  // Connect at all, so the button must not appear — see src/lib/health.ts.
+  const { data: available } = useAsync<boolean>(() => isHealthSyncAvailable(), [])
+  const { data: connected, reload } = useAsync<HealthSourceRow | null>(
+    () => (available ? fetchHealthSource() : Promise.resolve(null)),
+    [available],
+  )
 
   // Section 2 gives every goal a list of methods it accepts. V2 is excluded
-  // because it is the one that is unavailable, and V0 because a ranked goal
-  // leaves the ranking through S7, not through this screen.
+  // because it is the one being replaced, and V0 because a ranked goal leaves
+  // the ranking through S7, not through this screen.
   const alternatives = (library.verification_allowed ?? []).filter(
     (code) => code !== 'V2' && code !== 'V0',
   )
+  const syncable = !UNSUPPORTED_SENSOR_GOALS.includes(library.code)
+
+  async function run(action: () => Promise<unknown>) {
+    setBusy(true)
+    setFailed(null)
+    try {
+      await action()
+      reload()
+    } catch (caught) {
+      setFailed(caught instanceof Error ? caught.message : t('error.load'))
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
@@ -354,7 +388,58 @@ function SensorScreen({
       <p className="text-fg-muted mx-auto max-w-[280px] text-[13.5px] leading-relaxed">
         {t('sg.v2.explain')}
       </p>
-      <p className="text-fg-subtle text-[13px]">{t('sg.v2.unavailable')}</p>
+
+      {!available ? (
+        <p className="text-fg-subtle text-[13px]">{t('sg.v2.unavailable')}</p>
+      ) : !syncable ? (
+        // Sleep and daylight have no reader on either platform. Saying so beats
+        // a connect button that would silently return nothing.
+        <p className="text-fg-subtle text-[13px]">{t('sg.v2.notSyncable')}</p>
+      ) : !connected ? (
+        <PrimaryButton
+          className="text-on-cat mt-1 bg-[var(--cat)]"
+          disabled={busy}
+          onClick={() =>
+            void run(async () => {
+              await requestHealthPermissions()
+              await connectHealthSource()
+            })
+          }
+        >
+          {busy ? <Spinner className="border-current/30 border-t-current" /> : null}
+          {t('sg.v2.connect')}
+        </PrimaryButton>
+      ) : (
+        <>
+          <PrimaryButton
+            className="text-on-cat mt-1 bg-[var(--cat)]"
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                await syncHealthGoals()
+                navigate(-1)
+              })
+            }
+          >
+            {busy ? <Spinner className="border-current/30 border-t-current" /> : null}
+            {t('sg.v2.syncNow')}
+          </PrimaryButton>
+          {connected.last_synced_at ? (
+            <p className="text-fg-subtle text-[11.5px]">
+              {t('sg.v2.lastSynced').replace(
+                '{when}',
+                new Date(connected.last_synced_at).toLocaleString(),
+              )}
+            </p>
+          ) : null}
+        </>
+      )}
+
+      {failed ? (
+        <p role="alert" className="text-danger text-[12.5px]">
+          {failed}
+        </p>
+      ) : null}
 
       {alternatives.length > 0 ? (
         <div className="mt-2 flex w-full flex-col gap-2.5">

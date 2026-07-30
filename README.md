@@ -41,6 +41,9 @@ npm run dev
    - `supabase/migrations/0013_goal_media.sql` — דלי אחסון פרטי להוכחת מדיה (V6)
    - `supabase/migrations/0014_verification_fallback.sql` — אימות באחת מהשיטות
      החלופיות של המטרה, כשמקדם האמון נגזר מהשיטה שבה באמת השתמשו
+   - `supabase/migrations/0015_health_sync.sql` — קליטת V2 מאפליקציית הבריאות
+     של הטלפון: מקור לכל ביצוע, טבלת חיבורים, ופונקציית קליטה שנגישה
+     ל‑service role בלבד
 3. ב‑Authentication → Providers: הפעילו Email והפעילו Google (עם ה‑Client ID/Secret מ‑Google Cloud).
 4. ב‑Authentication → URL Configuration: הוסיפו את `http://localhost:5173/auth/callback`
    ואת כתובת הפרודקשן ל‑Redirect URLs.
@@ -100,6 +103,27 @@ npm test                       # 25 בדיקות יחידה למנוע הניק�
 `verify-sql.sh` דורש Postgres מקומי; העבירו לו `PGHOST`/`PGPORT`/`PGUSER`.
 הוא בונה מסד נתונים חד־פעמי, מדמה את סכמת `auth` של Supabase
 (`supabase/tests/harness.sql`), מריץ את המיגרציות ואז את `supabase/tests/rls.sql`.
+
+## אפליקציה נייטיב (Capacitor)
+
+פסגה נשארת PWA. העטיפה הנייטיב קיימת בשביל דבר אחד: **ל‑Apple Health ול‑Health
+Connect אין API ענן ואין API לדפדפן.** נתוני בריאות יושבים על המכשיר ורק
+אפליקציה מותקנת שהמשתמש נתן לה רשות יכולה לקרוא אותם — כלומר V2 בלתי נגיש
+מהדפדפן בכל מקרה. Health Connect הוא גם המקום שאליו Samsung Health כותב, אז
+צד אנדרואיד מכסה סמסונג בלי SDK ייעודי.
+
+```bash
+npm run build && npx cap sync      # מעביר את dist/ לשתי הפלטפורמות
+npx cap open android               # דורש Android Studio
+npx cap open ios                   # דורש macOS + Xcode
+```
+
+מה שכבר מוגדר: הרשאות Health Connect ופעילות ההסבר ב‑`AndroidManifest.xml`,
+`NSHealthShareUsageDescription` ו‑entitlement של HealthKit בצד iOS.
+
+**מה שחסר כדי לבנות בפועל:** חשבון Apple Developer (99$ לשנה) עם יכולת HealthKit
+על ה‑App ID, חשבון Google Play (25$ חד־פעמי) עם הצהרת גישה לנתוני בריאות,
+ומכשיר אמיתי — אין אמולטור עם נתוני בריאות אמיתיים.
 
 ## מבנה
 
@@ -193,10 +217,13 @@ scripts/
 
 - **ערכי הנקודות** — המנגנון סגור (ערך נפרד לכל מטרה, ב‑`goals_library.points`),
   אבל המספרים עצמם הם הצעה שנעגנה ב‑"+40" שמופיע בעיצוב. לשינוי — `0004_goal_points.sql`.
-- **סנכרון חיישן (V2)** — שש מטרות מוגדרות V2, ואין עדיין אינטגרציה ל‑Google Fit
-  או ל‑HealthKit. המסך אומר זאת ומציע את השיטות החלופיות שהמטרה מתירה, עם מקדם
-  האמון הנמוך יותר שלהן. **אין נפילה לקלט ידני בכוונה** — V2 הוא היחיד ששווה ×1.2,
-  ומספר שמקלידים שנושא את המקדם הזה הוא הדרך הקלה ביותר לנפח את טבלת הצמיחה.
+- **אימות מכשיר (App Attest / Play Integrity)** — `health-sync` מאמת היום JWT
+  בלבד. JWT מוכיח **מי** שואל, לא **מאיפה** — כלומר לא שהבקשה הגיעה מהאפליקציה
+  שלנו על טלפון אמיתי ולא מ‑curl. למקדם ×1.2 זה לא מספיק. נקודת החיבור מסומנת
+  בקובץ ה‑Edge Function; היא דורשת App ID ו‑Team ID אמיתיים ופרויקט Google Cloud,
+  ולכן לא נכתבה על עיוור. **חובה לפני פרודקשן.**
+- **מסלול הבריאות לא נבדק על מכשיר** — אין כאן iOS, אין Xcode, אין Health Connect.
+  כל מה שנבדק הוא צד השרת (11 בדיקות SQL) ושהבנייה לוובידע נשארת תקינה.
 - **שלושה ייחוסי ציטוט שנויים במחלוקת** — מסומנים `disputed` ב‑`src/lib/quotes.ts`
   (אריסטו/ויל דוראנט, לינקולן, ושם המחבר של הציטוט הראשון).
 - **סנכרון צעדים** — מטרות `sensor_sync` מציגות שהחיבור אינו קיים במקום לקבל דיווח עצמי.

@@ -1982,4 +1982,176 @@ select assert_denied(
   'the 40-character floor still applies when V5 is named explicitly'
 );
 
+-- -----------------------------------------------------------------------------
+-- Health sync (0015)
+--
+-- The V2 ingest path. Every one of these is a way the ×1.2 multiplier could be
+-- claimed without a sensor actually having measured anything.
+-- -----------------------------------------------------------------------------
+
+select assert(
+  (select count(*) from pg_proc p
+   where p.proname = 'record_health_completion'
+     and has_function_privilege('authenticated', p.oid, 'execute')) = 0,
+  'a signed-in user cannot call record_health_completion — it is service-role only'
+);
+
+select assert(
+  (select count(*) from pg_proc p
+   where p.proname = 'connect_health_source'
+     and has_function_privilege('authenticated', p.oid, 'execute')) = 0,
+  'a signed-in user cannot claim a health connection for themselves'
+);
+
+-- A user cannot forge the connection row directly either: there is no insert
+-- policy, only select and delete.
+select assert_denied(
+  '99999999-9999-9999-9999-999999999999',
+  $$insert into health_sources (user_id, source)
+    values ('99999999-9999-9999-9999-999999999999', 'apple_health')$$,
+  'a user cannot insert their own health_sources row'
+);
+
+-- Reuses the P-08 goal adopted for the 0014 fallback tests above: one
+-- adoption per library goal per user, and P-08 is the sensor goal.
+do $$
+begin
+  perform set_config('pisga.health_goal', current_setting('pisga.v2_goal'), false);
+end $$;
+
+-- Without a connection there is nothing to trust.
+do $$
+declare v_failed boolean := false;
+begin
+  begin
+    perform record_health_completion(
+      '99999999-9999-9999-9999-999999999999',
+      current_setting('pisga.health_goal')::uuid, 6000, 'apple_health', false);
+  exception when others then
+    v_failed := true;
+    raise notice 'ok: a reading is refused before the store is connected (rejected: %)', sqlerrm;
+  end;
+  if not v_failed then
+    raise exception 'FAILED: a reading was accepted with no health_sources row';
+  end if;
+end $$;
+
+do $$
+begin
+  perform connect_health_source(
+    '99999999-9999-9999-9999-999999999999', 'apple_health',
+    array['steps', 'distance'], 'iPhone 15');
+end $$;
+
+-- Layer 1 — the whole reason this migration exists.
+do $$
+declare v_failed boolean := false;
+begin
+  begin
+    perform record_health_completion(
+      '99999999-9999-9999-9999-999999999999',
+      current_setting('pisga.health_goal')::uuid, 20000, 'apple_health', true);
+  exception when others then
+    v_failed := true;
+    raise notice 'ok: a hand-entered Health sample cannot verify a sensor goal (rejected: %)', sqlerrm;
+  end;
+  if not v_failed then
+    raise exception 'FAILED: a hand-entered sample earned a sensor completion';
+  end if;
+end $$;
+
+do $$
+begin
+  perform record_health_completion(
+    '99999999-9999-9999-9999-999999999999',
+    current_setting('pisga.health_goal')::uuid, 6200, 'apple_health', false,
+    current_date, 'iPhone 15');
+end $$;
+
+select assert(
+  (select trust_multiplier = 1.2 and source = 'apple_health' and source_device = 'iPhone 15'
+   from goal_completions
+   where user_goal_id = current_setting('pisga.health_goal')::uuid) ,
+  'a device reading is worth ×1.2 and keeps its provenance'
+);
+
+select assert(
+  (select last_synced_at is not null from health_sources
+   where user_id = '99999999-9999-9999-9999-999999999999' and source = 'apple_health'),
+  'a successful sync stamps the connection'
+);
+
+-- A sensor reporting yesterday is normal — protection 7 restricts V4/V7 only.
+do $$
+begin
+  perform record_health_completion(
+    '99999999-9999-9999-9999-999999999999',
+    current_setting('pisga.health_goal')::uuid, 5800, 'apple_health', false,
+    current_date - 1, 'iPhone 15');
+  raise notice 'ok: a sensor may report yesterday';
+end $$;
+
+-- A goal measured another way is not fair game just because steps were read.
+do $$
+declare v_lib uuid; v_goal uuid; v_failed boolean := false;
+begin
+  select id into v_lib from goals_library where code = 'A-05';  -- V8, flashcards
+  insert into user_goals (user_id, library_id, is_custom, title, category, goal_type,
+                          verification, verification_code, current_level_value, personal_record_value)
+  values ('99999999-9999-9999-9999-999999999999', v_lib, false, 'כרטיסיות', 'academic',
+          'daily', 'checkbox_reflection', 'V8', 20, 20)
+  returning id into v_goal;
+
+  begin
+    perform record_health_completion(
+      '99999999-9999-9999-9999-999999999999', v_goal, 40, 'apple_health', false);
+  exception when others then
+    v_failed := true;
+    raise notice 'ok: a non-sensor goal cannot be completed from the health store (rejected: %)', sqlerrm;
+  end;
+  if not v_failed then
+    raise exception 'FAILED: a V8 goal was completed from a step count';
+  end if;
+end $$;
+
+-- One user's device cannot write into another user's goal.
+do $$
+declare v_failed boolean := false;
+begin
+  begin
+    perform record_health_completion(
+      '11111111-1111-1111-1111-111111111111',
+      current_setting('pisga.health_goal')::uuid, 9000, 'apple_health', false);
+  exception when others then
+    v_failed := true;
+    raise notice 'ok: a health reading cannot be written into someone else''s goal (rejected: %)', sqlerrm;
+  end;
+  if not v_failed then
+    raise exception 'FAILED: a reading crossed users';
+  end if;
+end $$;
+
+-- The app asks which goals to read from the phone; it must only ever get its own.
+do $$
+declare v_mine int; v_theirs int;
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '99999999-9999-9999-9999-999999999999', true);
+  select count(*) into v_mine from my_health_goals();
+  reset role;
+
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  select count(*) into v_theirs from my_health_goals();
+  reset role;
+
+  if v_mine < 1 then
+    raise exception 'FAILED: my_health_goals returned nothing for the owner';
+  end if;
+  if v_theirs <> 0 then
+    raise exception 'FAILED: my_health_goals leaked % goal(s) to another user', v_theirs;
+  end if;
+  raise notice 'ok: my_health_goals returns the caller''s sensor goals and nobody else''s';
+end $$;
+
 \echo 'all RLS tests passed'
