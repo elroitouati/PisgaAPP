@@ -114,12 +114,24 @@ Connect אין API ענן ואין API לדפדפן.** נתוני בריאות �
 
 ```bash
 npm run build && npx cap sync      # מעביר את dist/ לשתי הפלטפורמות
-npx cap open android               # דורש Android Studio
+cd android && ./gradlew assembleDebug   # APK להתקנה ישירה, בלי חשבון Google Play
 npx cap open ios                   # דורש macOS + Xcode
 ```
 
-מה שכבר מוגדר: הרשאות Health Connect ופעילות ההסבר ב‑`AndroidManifest.xml`,
-`NSHealthShareUsageDescription` ו‑entitlement של HealthKit בצד iOS.
+ה‑APK יוצא ל‑`android/app/build/outputs/apk/debug/app-debug.apk` ואפשר להעביר
+אותו ישירות לטלפון — **אין צורך בחשבון מפתח כדי לבדוק על אנדרואיד.**
+דורש `ANDROID_HOME` עם `platforms;android-36` ו‑`build-tools;35.0.0`.
+
+`minSdkVersion` הועלה ל‑26 (אנדרואיד 8.0): הספרייה של Health Connect מצהירה
+על 26, ומיזוג המניפסט נכשל מתחת לזה. הדרך העוקפת שאנדרואיד מציע רק מעבירה
+את הכשל לזמן ריצה.
+
+מה שכבר מוגדר ו**נבדק בבנייה אמיתית**: ה‑APK נבנה, ונושא בדיוק שלוש הרשאות
+בריאות — `READ_STEPS`, `READ_DISTANCE`, `READ_EXERCISE`. התוסף מזריק גם דופק,
+קלוריות ומסלול; הן מוסרות במיזוג, כי מדיניות גוגל דורשת להצדיק כל הרשאה
+ובקשת דופק כדי לספור צעדים היא גם חריגה וגם סיכון בביקורת.
+בצד iOS מוגדרים `NSHealthShareUsageDescription` ו‑entitlement של HealthKit —
+**לא נבנה**, בנייה ל‑iOS דורשת macOS.
 
 **מה שחסר כדי לבנות בפועל:** חשבון Apple Developer (99$ לשנה) עם יכולת HealthKit
 על ה‑App ID, חשבון Google Play (25$ חד־פעמי) עם הצהרת גישה לנתוני בריאות,

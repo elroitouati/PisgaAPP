@@ -1,5 +1,10 @@
 ext {
-    minSdkVersion = 24
+    // 26, not Capacitor's default 24: androidx.health.connect:connect-client
+    // declares minSdk 26 and the manifest merger refuses anything lower. The
+    // documented escape hatch (tools:overrideLibrary) only moves the failure
+    // to runtime on the devices it lets in, which for a health read is worse
+    // than not installing. API 26 is Android 8.0 (2017).
+    minSdkVersion = 26
     compileSdkVersion = 36
     targetSdkVersion = 36
     androidxActivityVersion = '1.11.0'
