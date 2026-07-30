@@ -167,7 +167,7 @@ function weeklyFloor(metricKey, l1) {
 const q = (s) => (s === null || s === undefined ? 'null' : `'${String(s).replace(/'/g, "''")}'`)
 const n = (v) => (v === null || v === undefined ? 'null' : String(v))
 
-const rows = GOALS.map((g, i) => {
+const rows = GOALS.map((g) => {
   const [code, titleHe, titleEn, sub, metricKey, metricUnit, dir, ceiling,
          bp, l1, step, vDefault, vExtra, questions, widget, window] = g
 

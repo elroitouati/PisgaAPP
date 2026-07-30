@@ -29,7 +29,18 @@ npm run dev
    - `supabase/migrations/0008_group_admins.sql` — כמה מנהלים בקבוצה, לא בעלים יחיד.
      **גם כאן** יש `<PROJECT_REF>`/`<WEBHOOK_SECRET>` להחליף (טריגר הצטרפות דרך קישור)
    - `supabase/migrations/0009_clear_goals_library.sql` — מרוקן את תוכן ספריית
-     המטרות הזמני (0002); הצוות מחליף אותו בתוכן האמיתי בנפרד
+     המטרות הזמני (0002)
+   - `supabase/migrations/0010_structured_goals.sql` — סכימת המטרות המובנות:
+     קטלוג האימות V0–V8, 14 השדות של המטרה בספרייה, מצב הרמה של המשתמש,
+     `weekly_metrics` ו‑`level_changes`
+   - `supabase/migrations/0011_seed_structured_goals.sql` — 80 המטרות המובנות
+     (P‑01…I‑20). **נוצר אוטומטית** מ‑`scripts/generate-goals-seed.mjs`; לעדכון
+     ערכו את הסקריפט והריצו אותו מחדש, לא את קובץ ה‑SQL
+   - `supabase/migrations/0012_growth_engine.sql` — מנוע הצמיחה: חישוב הנקודות
+     השבועיות, כיול, שינוי רמה עם צינון 72 שעות, המרה למטרה אישית וטבלת הצמיחה
+   - `supabase/migrations/0013_goal_media.sql` — דלי אחסון פרטי להוכחת מדיה (V6)
+   - `supabase/migrations/0014_verification_fallback.sql` — אימות באחת מהשיטות
+     החלופיות של המטרה, כשמקדם האמון נגזר מהשיטה שבה באמת השתמשו
 3. ב‑Authentication → Providers: הפעילו Email והפעילו Google (עם ה‑Client ID/Secret מ‑Google Cloud).
 4. ב‑Authentication → URL Configuration: הוסיפו את `http://localhost:5173/auth/callback`
    ואת כתובת הפרודקשן ל‑Redirect URLs.
@@ -77,8 +88,14 @@ npm run dev
 
 ```bash
 npm run build                  # typecheck + build
-./scripts/verify-sql.sh        # מיגרציות + 105 בדיקות RLS, באדג׳ים, נקודות והתראות על Postgres זמני
+npm test                       # 25 בדיקות יחידה למנוע הניקוד (src/lib/growth.ts)
+./scripts/verify-sql.sh        # מיגרציות + 159 בדיקות RLS, באדג׳ים, נקודות, מנוע צמיחה והתראות על Postgres זמני
 ```
+
+מנוע הניקוד קיים פעמיים בכוונה: `src/lib/growth.ts` הוא פונקציה טהורה שהמסכים
+מציגים איתה תחזיות, ו‑`compute_weekly_metrics` ב‑0012 הוא הסמכות — `weekly_metrics`
+מזין את טבלת הצמיחה ולכן אין ללקוח הרשאת כתיבה אליו. שתי המימושים נעולים על
+אותה דוגמה מסעיף 3.3 של מסמך הספרייה (דני 10→20 מרוויח יותר מיוסי 50→60).
 
 `verify-sql.sh` דורש Postgres מקומי; העבירו לו `PGHOST`/`PGPORT`/`PGUSER`.
 הוא בונה מסד נתונים חד־פעמי, מדמה את סכמת `auth` של Supabase
@@ -92,11 +109,15 @@ src/
   providers/     Auth, Profile, Theme
   hooks/         useGoals (מעקב יומי), useGuidedSession (טיימר), useBadges,
                  usePoints, useAsync
-  lib/           supabase, api (שאילתות), categories, scoring, dates, quotes, push
+  lib/           supabase, api (שאילתות), categories, scoring, dates, quotes, push,
+                 growth (מנוע הניקוד כפונקציה טהורה), structuredGoals (שכבת הנתונים)
   components/    ui, icons, GoalRow, BottomNav, AppShell
   pages/         Login, Onboarding, Home, CategoryScreen, GuidedSession,
                  Library, Achievements, Calendar, Friends, Chat, SharedGoal,
                  Profile ותת־המסכים שלו
+  pages/goals/   15 המסכים המשותפים של המטרות המובנות: GoalCard (S1+S3+S7),
+                 Calibrate (S2), GoalProgress (S4), GoalBuilder (S5),
+                 WeeklySummary (S6), Verify (VS0–VS8 במסלול אחד)
   sw.ts          Service Worker בכתב יד (injectManifest) — push + notificationclick
 supabase/
   migrations/    סכמה + seed
@@ -172,9 +193,10 @@ scripts/
 
 - **ערכי הנקודות** — המנגנון סגור (ערך נפרד לכל מטרה, ב‑`goals_library.points`),
   אבל המספרים עצמם הם הצעה שנעגנה ב‑"+40" שמופיע בעיצוב. לשינוי — `0004_goal_points.sql`.
-- **תוכן ספריית המטרות** — הטיוטה הראשונית (21 מטרות, PRD 13) נמחקה
-  ב‑`0009_clear_goals_library.sql`; הצוות מכין תוכן אמיתי (מטרות מובנות
-  מותאמות, אימות לכל מטרה) שיוחלף בו. עד אז `goals_library` ריקה בכוונה.
+- **סנכרון חיישן (V2)** — שש מטרות מוגדרות V2, ואין עדיין אינטגרציה ל‑Google Fit
+  או ל‑HealthKit. המסך אומר זאת ומציע את השיטות החלופיות שהמטרה מתירה, עם מקדם
+  האמון הנמוך יותר שלהן. **אין נפילה לקלט ידני בכוונה** — V2 הוא היחיד ששווה ×1.2,
+  ומספר שמקלידים שנושא את המקדם הזה הוא הדרך הקלה ביותר לנפח את טבלת הצמיחה.
 - **שלושה ייחוסי ציטוט שנויים במחלוקת** — מסומנים `disputed` ב‑`src/lib/quotes.ts`
   (אריסטו/ויל דוראנט, לינקולן, ושם המחבר של הציטוט הראשון).
 - **סנכרון צעדים** — מטרות `sensor_sync` מציגות שהחיבור אינו קיים במקום לקבל דיווח עצמי.

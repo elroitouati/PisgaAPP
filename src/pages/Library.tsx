@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useI18n } from '@/i18n/useI18n'
 import { useAuth } from '@/providers/useAuth'
 import { useAsync } from '@/hooks/useAsync'
-import { adoptLibraryGoal, createCustomGoal, fetchLibrary, fetchTrackedGoals } from '@/lib/api'
+import { createCustomGoal, fetchLibrary, fetchTrackedGoals } from '@/lib/api'
 import { CATEGORIES, CATEGORY_META, categoryStyle, type Category } from '@/lib/categories'
 import { todayKey } from '@/lib/dates'
 import { BackIcon, CheckIcon, PlusIcon } from '@/components/icons'
@@ -21,10 +21,10 @@ export default function Library() {
   const navigate = useNavigate()
 
   const [tab, setTab] = useState<Category>('physical')
-  const [adopting, setAdopting] = useState<string | null>(null)
-  const [adopted, setAdopted] = useState<Set<string>>(new Set())
-  // The sheet's "your own goal" choice lands here with the form already open;
-  // the calendar timeline's empty-state CTA additionally pre-selects "long term".
+  // The calendar timeline's empty-state CTA lands here with the deadline form
+  // already open. Everything else now goes to the builder at /goal/new — the
+  // inline form is kept only because it is the one place a target date can be
+  // set, which the builder has no concept of.
   const [params] = useSearchParams()
   const [showCustom, setShowCustom] = useState(params.get('new') === '1')
   const defaultLongTerm = params.get('longTerm') === '1'
@@ -35,24 +35,12 @@ export default function Library() {
     [user?.id],
   )
 
-  const alreadyAdded = useMemo(() => {
-    const ids = new Set((mine.data ?? []).map((goal) => goal.library_id).filter(Boolean))
-    for (const id of adopted) ids.add(id)
-    return ids
-  }, [mine.data, adopted])
+  const alreadyAdded = useMemo(
+    () => new Set((mine.data ?? []).map((goal) => goal.library_id).filter(Boolean)),
+    [mine.data],
+  )
 
   const shown = (library.data ?? []).filter((goal) => goal.category === tab)
-
-  async function adopt(goal: LibraryGoal) {
-    if (!user) return
-    setAdopting(goal.id)
-    try {
-      await adoptLibraryGoal(user.id, goal)
-      setAdopted((prev) => new Set(prev).add(goal.id))
-    } finally {
-      setAdopting(null)
-    }
-  }
 
   return (
     <>
@@ -116,10 +104,13 @@ export default function Library() {
                       goal.suggested_frequency}
                   </div>
                 </div>
+                {/* Adding is a two-screen act now: a structured goal without a
+                    calibrated opening level would sit outside the scoring
+                    engine entirely, so the ＋ opens S2 rather than inserting. */}
                 <button
                   type="button"
-                  onClick={() => void adopt(goal)}
-                  disabled={added || adopting === goal.id}
+                  onClick={() => navigate(`/library/${goal.id}/calibrate`)}
+                  disabled={added}
                   aria-label={t('nav.add')}
                   style={categoryStyle(goal.category)}
                   className={`flex size-7 flex-none items-center justify-center rounded-full ${
@@ -128,13 +119,7 @@ export default function Library() {
                       : 'border-line text-fg-muted border disabled:opacity-50'
                   }`}
                 >
-                  {adopting === goal.id ? (
-                    <Spinner className="size-3.5 border-current/30 border-t-current" />
-                  ) : added ? (
-                    <CheckIcon size={15} />
-                  ) : (
-                    <PlusIcon size={16} />
-                  )}
+                  {added ? <CheckIcon size={15} /> : <PlusIcon size={16} />}
                 </button>
               </Card>
             )
@@ -159,7 +144,7 @@ export default function Library() {
       ) : (
         <button
           type="button"
-          onClick={() => setShowCustom(true)}
+          onClick={() => navigate('/goal/new')}
           className="border-line text-fg-muted flex items-center justify-center gap-2 rounded-[14px] border border-dashed px-4 py-4 text-[13px]"
         >
           <PlusIcon size={18} />

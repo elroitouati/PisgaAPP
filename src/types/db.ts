@@ -1,4 +1,5 @@
 import type { Category } from '@/lib/categories'
+import type { VerificationCode } from '@/lib/structuredGoals'
 
 /** Mirrors supabase/migrations/0001_initial_schema.sql. */
 
@@ -75,6 +76,16 @@ export type UserGoal = {
   completed_at: string | null
   active: boolean
   added_at: string
+  /**
+   * Structured-goal state (migration 0010). Present on every row the API
+   * selects with `*`, but null on goals adopted before the migration — which
+   * is what the tracking screens branch on to decide whether a goal belongs to
+   * the growth engine or to the older checkbox flow.
+   */
+  verification_code: VerificationCode | null
+  current_level_value: number | null
+  personal_record_value: number | null
+  counts_for_ranking: boolean
 }
 
 export type GoalCompletion = {

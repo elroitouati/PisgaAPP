@@ -198,6 +198,13 @@ export const CalendarIcon = (p: IconProps) => (
   </Icon>
 )
 
+/** Rising bars — the weekly growth summary, not a generic "stats" chart. */
+export const GrowthIcon = (p: IconProps) => (
+  <Icon strokeWidth={1.7} {...p}>
+    <path d="M5 20V14M12 20V9M19 20V5" strokeLinecap="round" />
+  </Icon>
+)
+
 /** Solid paper plane; points along the reading direction like BackIcon. */
 export const SendIcon = ({ size = 22, className = '', ...rest }: IconProps) => (
   <svg

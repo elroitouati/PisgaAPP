@@ -117,7 +117,10 @@ export async function createCustomGoal(
   return unwrap(
     await supabase
       .from('user_goals')
-      .insert({ ...goal, user_id: userId, is_custom: true })
+      // Section 1 of the goals library: a personal goal earns bonus points but
+      // never enters the shared ranking. Set at insert rather than patched
+      // afterwards, so a failed second call cannot leave a ranked personal goal.
+      .insert({ ...goal, user_id: userId, is_custom: true, counts_for_ranking: false })
       .select('*')
       .single(),
   )

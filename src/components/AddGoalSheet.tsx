@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useI18n } from '@/i18n/useI18n'
 import { useAuth } from '@/providers/useAuth'
 import { useAsync } from '@/hooks/useAsync'
-import { adoptLibraryGoal, fetchSuggestions } from '@/lib/api'
+import { fetchSuggestions } from '@/lib/api'
 import { CATEGORY_META, categoryStyle } from '@/lib/categories'
 import { BackIcon, FriendsIcon, PersonalIcon, SummitIcon } from '@/components/icons'
 import type { LibraryGoal } from '@/types/db'
@@ -21,7 +21,7 @@ export function AddGoalSheet({ open, onClose }: { open: boolean; onClose: () => 
   const navigate = useNavigate()
   const panel = useRef<HTMLDivElement>(null)
 
-  const { data, reload } = useAsync<LibraryGoal[]>(
+  const { data } = useAsync<LibraryGoal[]>(
     () => (user && open ? fetchSuggestions(user.id, 2) : Promise.resolve([])),
     [user?.id, open],
   )
@@ -40,12 +40,11 @@ export function AddGoalSheet({ open, onClose }: { open: boolean; onClose: () => 
 
   const suggestions = data ?? []
 
-  async function adopt(goal: LibraryGoal) {
-    if (!user) return
-    await adoptLibraryGoal(user.id, goal)
-    reload()
+  // A suggestion is a shortcut into calibration, not a one-tap adoption: the
+  // opening level is the goal's whole starting point and only the user knows it.
+  function suggest(goal: LibraryGoal) {
     onClose()
-    navigate(`/category/${goal.category}`)
+    navigate(`/library/${goal.id}/calibrate`)
   }
 
   return (
@@ -87,7 +86,7 @@ export function AddGoalSheet({ open, onClose }: { open: boolean; onClose: () => 
             subtitle={t('sheet.customSub')}
             onClick={() => {
               onClose()
-              navigate('/library?new=1')
+              navigate('/goal/new')
             }}
           />
           <Choice
@@ -118,7 +117,7 @@ export function AddGoalSheet({ open, onClose }: { open: boolean; onClose: () => 
                   <button
                     key={goal.id}
                     type="button"
-                    onClick={() => void adopt(goal)}
+                    onClick={() => suggest(goal)}
                     style={categoryStyle(goal.category)}
                     className="border-line bg-surface flex flex-1 items-center gap-2.5 rounded-[13px] border px-3 py-[11px] text-start"
                   >

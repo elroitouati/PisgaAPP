@@ -42,6 +42,11 @@ export function GoalRow({ goal, onComplete, onUndo }: Props) {
   }
 
   function handleToggle() {
+    // A structured goal is not a checkbox: it records a measured value against
+    // a level, which is what the VS screens exist for. Undo included — undoing
+    // one has to recompute the week, not just delete a row.
+    if (goal.verification_code) return navigate(`/goal/${goal.id}`)
+
     if (goal.completedToday) return void run(() => onUndo(goal.id))
 
     switch (goal.verification) {
@@ -92,9 +97,11 @@ export function GoalRow({ goal, onComplete, onUndo }: Props) {
         <button type="button" onClick={handleToggle} className="flex-1 text-start" disabled={busy}>
           <div className="text-[14.5px] font-semibold">{goal.title}</div>
           <div className="text-fg-muted mt-0.5 text-xs">
-            {goal.completedToday
-              ? `${t('verify.completed')}${points > 0 ? ` · +${points} ${t('home.stat.points')}` : ''}`
-              : subtitleFor(goal, t)}
+            {goal.verification_code
+              ? `${t('sg.level')} ${goal.current_level_value ?? 0}`
+              : goal.completedToday
+                ? `${t('verify.completed')}${points > 0 ? ` · +${points} ${t('home.stat.points')}` : ''}`
+                : subtitleFor(goal, t)}
           </div>
         </button>
 

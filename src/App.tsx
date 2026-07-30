@@ -31,6 +31,12 @@ import InviteFriend from '@/pages/InviteFriend'
 import JoinInvite from '@/pages/JoinInvite'
 import NotFound from '@/pages/NotFound'
 import SetupRequired from '@/pages/SetupRequired'
+import Calibrate from '@/pages/goals/Calibrate'
+import GoalCard from '@/pages/goals/GoalCard'
+import GoalProgress from '@/pages/goals/GoalProgress'
+import Verify from '@/pages/goals/Verify'
+import GoalBuilder from '@/pages/goals/GoalBuilder'
+import WeeklySummary from '@/pages/goals/WeeklySummary'
 
 export default function App() {
   if (!isSupabaseConfigured) {
@@ -72,6 +78,16 @@ export default function App() {
                       <Route path="/profile/goals" element={<MyGoals />} />
                       <Route path="/profile/notifications" element={<NotificationsScreen />} />
                       <Route path="/profile/invite" element={<InviteFriend />} />
+
+                      {/* Structured goals (S1–S7 + VS1–VS8). All full-screen:
+                          each one is a single task the user is in the middle
+                          of, and a bottom bar invites them to abandon it. */}
+                      <Route path="/library/:libraryId/calibrate" element={<Calibrate />} />
+                      <Route path="/goal/new" element={<GoalBuilder />} />
+                      <Route path="/goal/:userGoalId" element={<GoalCard />} />
+                      <Route path="/goal/:userGoalId/verify" element={<Verify />} />
+                      <Route path="/goal/:userGoalId/progress" element={<GoalProgress />} />
+                      <Route path="/weekly" element={<WeeklySummary />} />
 
                       <Route element={<AppShell />}>
                         <Route path="/" element={<Home />} />

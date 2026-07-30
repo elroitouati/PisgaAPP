@@ -1867,4 +1867,119 @@ begin
   raise notice 'ok: the growth leaderboard returns the caller and their friends';
 end $$;
 
+-- -----------------------------------------------------------------------------
+-- Goal media storage (0013)
+--
+-- The V6 bucket is private, unlike avatars. Two things must hold: the folder
+-- rule keeps one user out of another's proof, and the bucket itself is not
+-- readable by an anonymous visitor holding only the object path.
+-- -----------------------------------------------------------------------------
+
+select assert(
+  (select not public from storage.buckets where id = 'goal-media'),
+  'the goal-media bucket is private — proof of where someone was is not an avatar'
+);
+
+select assert_denied(
+  '11111111-1111-1111-1111-111111111111',
+  $$insert into storage.objects (bucket_id, name, owner)
+    values ('goal-media', '22222222-2222-2222-2222-222222222222/g/1.jpg',
+            '11111111-1111-1111-1111-111111111111')$$,
+  'a user cannot upload proof into another user''s goal-media folder'
+);
+
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  insert into storage.objects (bucket_id, name, owner)
+  values ('goal-media', '11111111-1111-1111-1111-111111111111/g/1.jpg',
+          '11111111-1111-1111-1111-111111111111');
+  reset role;
+end $$;
+
+do $$
+declare v_seen int;
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+  select count(*) into v_seen from storage.objects where bucket_id = 'goal-media';
+  reset role;
+  if v_seen <> 0 then
+    raise exception 'FAILED: another user could read % goal-media object(s)', v_seen;
+  end if;
+  raise notice 'ok: one user cannot read another user''s goal media';
+end $$;
+
+do $$
+declare v_seen int;
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
+  select count(*) into v_seen from storage.objects where bucket_id = 'goal-media';
+  reset role;
+  if v_seen <> 1 then
+    raise exception 'FAILED: the owner saw % of their own goal-media objects', v_seen;
+  end if;
+  raise notice 'ok: the owner reads their own goal media';
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- Verification fallback (0014)
+--
+-- P-08 (daily walking) defaults to V2 and allows {V2, V1, V6}. The user may
+-- complete it with an allowed alternative, and the trust multiplier must then
+-- be the alternative's — never the sensor's ×1.2.
+-- -----------------------------------------------------------------------------
+
+do $$
+declare v_lib uuid; v_goal uuid;
+begin
+  select id into v_lib from goals_library where code = 'P-08';  -- V2, allows V1/V6
+  insert into user_goals (user_id, library_id, is_custom, title, category, goal_type,
+                          verification, verification_code, current_level_value, personal_record_value)
+  values ('99999999-9999-9999-9999-999999999999', v_lib, false, 'הליכה', 'physical',
+          'daily', 'sensor_sync', 'V2', 5000, 5000)
+  returning id into v_goal;
+  perform set_config('pisga.v2_goal', v_goal::text, false);
+end $$;
+
+do $$
+declare v_goal uuid := current_setting('pisga.v2_goal')::uuid;
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '99999999-9999-9999-9999-999999999999', true);
+  perform record_structured_completion(v_goal, 5200, null, current_date, false, 'V6');
+  reset role;
+end $$;
+
+select assert(
+  (select trust_multiplier from goal_completions
+   where user_goal_id = current_setting('pisga.v2_goal')::uuid) = 1.1,
+  'a fallback completion is priced by the method actually used, not the goal''s default'
+);
+
+select assert_denied(
+  '99999999-9999-9999-9999-999999999999',
+  $$select record_structured_completion(current_setting('pisga.v2_goal')::uuid, 5200, null,
+                                        current_date, false, 'V3')$$,
+  'a method outside the goal''s verification_allowed is refused'
+);
+
+select assert_denied(
+  '99999999-9999-9999-9999-999999999999',
+  $$select record_structured_completion(current_setting('pisga.v2_goal')::uuid, 5200, null,
+                                        current_date, false, 'V0')$$,
+  'V0 is never in a library goal''s allowed list, so it cannot be chosen here'
+);
+
+-- The V5 minimum follows the method used, so falling back to V5 still has to
+-- say something. S-12 defaults to V5 and allows V6.
+select assert_denied(
+  '99999999-9999-9999-9999-999999999999',
+  $$select record_structured_completion(current_setting('pisga.v5_goal')::uuid, 1, 'קצר',
+                                        current_date, false, 'V5')$$,
+  'the 40-character floor still applies when V5 is named explicitly'
+);
+
 \echo 'all RLS tests passed'

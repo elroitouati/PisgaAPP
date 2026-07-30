@@ -6,7 +6,7 @@ import { useBadges } from '@/hooks/useBadges'
 import { CATEGORY_META } from '@/lib/categories'
 import { overallStreak } from '@/lib/scoring'
 import { useTotalPoints } from '@/hooks/usePoints'
-import { CalendarIcon, SummitIcon } from '@/components/icons'
+import { CalendarIcon, GrowthIcon, SummitIcon } from '@/components/icons'
 import {
   CategoryTile,
   EmptyState,
@@ -36,13 +36,22 @@ export default function Home() {
           <SummitIcon size={16} />
           <span className="text-[15px] font-extrabold tracking-[0.16em]">{t('app.wordmark')}</span>
         </div>
-        <Link
-          to="/calendar"
-          className="border-line text-fg-muted flex size-[34px] items-center justify-center rounded-full border"
-          aria-label={t('nav.calendar')}
-        >
-          <CalendarIcon size={17} />
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/weekly"
+            className="border-line text-fg-muted flex size-[34px] items-center justify-center rounded-full border"
+            aria-label={t('sg.weeklyTitle')}
+          >
+            <GrowthIcon size={17} />
+          </Link>
+          <Link
+            to="/calendar"
+            className="border-line text-fg-muted flex size-[34px] items-center justify-center rounded-full border"
+            aria-label={t('nav.calendar')}
+          >
+            <CalendarIcon size={17} />
+          </Link>
+        </div>
       </header>
 
       <div className="mt-4">
