@@ -9,13 +9,21 @@ import { BackIcon, MailIcon } from '@/components/icons'
 import { ThemeSwitch } from '@/components/ThemeSwitch'
 
 type Mode = 'choose' | 'signIn' | 'signUp'
-type Busy = null | 'google' | 'form'
+type Busy = null | 'google' | 'form' | 'otp'
 
 const PASSWORD_MIN = 8
 
+// The Google button is a dead end until a real OAuth app exists for this
+// project: signInWithOAuth navigates the whole page to Supabase's
+// /authorize endpoint before any JS of ours runs, so a "provider not
+// enabled" 400 renders as raw JSON with no chance for a try/catch to turn
+// it into a friendly message. Hidden rather than shown-and-broken.
+const GOOGLE_AUTH_ENABLED = import.meta.env.VITE_GOOGLE_AUTH_ENABLED === 'true'
+
 /** Design 5f (light) / 3a (dark). */
 export default function Login() {
-  const { session, signInWithGoogle, signInWithPassword, signUpWithPassword } = useAuth()
+  const { session, signInWithGoogle, signInWithPassword, signUpWithPassword, verifySignupCode } =
+    useAuth()
   const { t } = useI18n()
   const { theme } = useTheme()
   const location = useLocation()
@@ -23,8 +31,12 @@ export default function Login() {
   const [mode, setMode] = useState<Mode>('choose')
   const [busy, setBusy] = useState<Busy>(null)
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
   const [form, setForm] = useState({ email: '', password: '', name: '' })
+  // Set once signUp comes back needing confirmation. Its presence, not `mode`,
+  // is what switches the screen to the code field — the two are independent
+  // because the user could in principle back out and return to this state.
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null)
+  const [code, setCode] = useState('')
 
   if (session) {
     const from = (location.state as { from?: { pathname: string } } | null)?.from
@@ -49,7 +61,6 @@ export default function Login() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setError(null)
-    setNotice(null)
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
       setError(t('auth.error.invalidEmail'))
@@ -64,13 +75,28 @@ export default function Login() {
     try {
       if (mode === 'signUp') {
         const needsConfirmation = await signUpWithPassword(form.email, form.password, form.name)
-        if (needsConfirmation) setNotice(t('auth.confirmEmail'))
+        if (needsConfirmation) setPendingEmail(form.email)
       } else {
         await signInWithPassword(form.email, form.password)
       }
     } catch (caught) {
       setError(messageFor(caught, mode, t))
     } finally {
+      setBusy(null)
+    }
+  }
+
+  async function handleVerifyCode(event: FormEvent) {
+    event.preventDefault()
+    if (!pendingEmail) return
+    setError(null)
+    setBusy('otp')
+    try {
+      await verifySignupCode(pendingEmail, code.trim())
+      // Success updates the session via onAuthStateChange; the `if (session)`
+      // guard above then navigates away on the next render.
+    } catch {
+      setError(t('auth.error.badCode'))
       setBusy(null)
     }
   }
@@ -98,23 +124,65 @@ export default function Login() {
         </p>
       </div>
 
-      {mode === 'choose' ? (
-        <div className="flex flex-col gap-[11px]">
+      {pendingEmail ? (
+        <form onSubmit={handleVerifyCode} className="flex flex-col gap-3">
+          <p className="text-fg-muted text-center text-[13px] leading-relaxed">
+            {t('auth.confirmEmail').replace('{email}', pendingEmail)}
+          </p>
+
+          <Field
+            id="otp"
+            type="text"
+            inputMode="numeric"
+            dir="ltr"
+            label={t('auth.otpLabel')}
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+            autoComplete="one-time-code"
+            disabled={busy !== null}
+            className="text-center text-[20px] tracking-[0.3em]"
+          />
+
+          <button
+            type="submit"
+            disabled={busy !== null || code.trim().length === 0}
+            className="bg-brand text-on-brand mt-1 flex h-[52px] items-center justify-center gap-2 rounded-[14px] text-[15px] font-semibold disabled:opacity-60"
+          >
+            {busy === 'otp' ? <Spinner className="border-on-brand/30 border-t-on-brand" /> : null}
+            {t('auth.otpSubmit')}
+          </button>
+
           <button
             type="button"
-            onClick={handleGoogle}
-            disabled={busy !== null}
-            className="bg-brand text-on-brand flex h-[52px] items-center justify-center gap-2.5 rounded-[14px] text-[15px] font-semibold disabled:opacity-60"
+            onClick={() => {
+              setPendingEmail(null)
+              setCode('')
+              setError(null)
+            }}
+            className="text-fg-muted mt-1 text-[13px]"
           >
-            {busy === 'google' ? (
-              <Spinner className="border-on-brand/30 border-t-on-brand" />
-            ) : (
-              <span className="bg-on-brand text-brand flex size-[22px] items-center justify-center rounded-full text-sm font-bold">
-                G
-              </span>
-            )}
-            {t('auth.google')}
+            {t('common.back')}
           </button>
+        </form>
+      ) : mode === 'choose' ? (
+        <div className="flex flex-col gap-[11px]">
+          {GOOGLE_AUTH_ENABLED ? (
+            <button
+              type="button"
+              onClick={handleGoogle}
+              disabled={busy !== null}
+              className="bg-brand text-on-brand flex h-[52px] items-center justify-center gap-2.5 rounded-[14px] text-[15px] font-semibold disabled:opacity-60"
+            >
+              {busy === 'google' ? (
+                <Spinner className="border-on-brand/30 border-t-on-brand" />
+              ) : (
+                <span className="bg-on-brand text-brand flex size-[22px] items-center justify-center rounded-full text-sm font-bold">
+                  G
+                </span>
+              )}
+              {t('auth.google')}
+            </button>
+          ) : null}
 
           <button
             type="button"
@@ -132,7 +200,6 @@ export default function Login() {
             onClick={() => {
               setMode('choose')
               setError(null)
-              setNotice(null)
             }}
             className="text-fg-muted -mt-2 mb-1 flex items-center gap-1.5 self-start text-[13px]"
           >
@@ -189,7 +256,6 @@ export default function Login() {
             onClick={() => {
               setMode(mode === 'signUp' ? 'signIn' : 'signUp')
               setError(null)
-              setNotice(null)
             }}
             className="text-fg-muted mt-1 text-[13px]"
           >
@@ -203,12 +269,6 @@ export default function Login() {
           {error}
         </p>
       ) : null}
-      {notice ? (
-        <p role="status" className="text-fg-muted mt-4 text-center text-xs">
-          {notice}
-        </p>
-      ) : null}
-
       <p className="text-fg-subtle mt-5 text-center text-[11px] leading-relaxed">
         {t('auth.terms')}
       </p>
@@ -219,6 +279,7 @@ export default function Login() {
 function Field({
   id,
   label,
+  className = '',
   ...input
 }: { id: string; label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
@@ -227,7 +288,7 @@ function Field({
       <input
         id={id}
         {...input}
-        className="border-line bg-surface focus:border-fg h-[52px] rounded-[14px] border px-4 text-[15px] transition-colors outline-none disabled:opacity-60"
+        className={`border-line bg-surface focus:border-fg h-[52px] rounded-[14px] border px-4 text-[15px] transition-colors outline-none disabled:opacity-60 ${className}`}
       />
     </label>
   )

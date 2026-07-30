@@ -65,7 +65,10 @@ const he = {
   'auth.error.shortPassword': 'הסיסמה חייבת להכיל לפחות 8 תווים.',
   'auth.error.badCredentials': 'האימייל או הסיסמה שגויים.',
   'auth.error.emailTaken': 'כבר קיים חשבון עם האימייל הזה.',
-  'auth.confirmEmail': 'שלחנו לך מייל אימות. אשרו אותו כדי להתחיל.',
+  'auth.confirmEmail': 'שלחנו קוד אימות ל-{email}. הזינו אותו למטה כדי להתחיל.',
+  'auth.otpLabel': 'קוד האימות מהמייל',
+  'auth.otpSubmit': 'אשר',
+  'auth.error.badCode': 'הקוד שגוי או פג תוקף. בדקו את המייל ונסו שוב.',
 
   // Onboarding (design 3b / 3c)
   'onboarding.step1.title': 'על מה נתמקד?',
@@ -555,7 +558,10 @@ const en: Record<TranslationKey, string> = {
   'auth.error.shortPassword': 'Password must be at least 8 characters.',
   'auth.error.badCredentials': 'Wrong email or password.',
   'auth.error.emailTaken': 'An account with that email already exists.',
-  'auth.confirmEmail': 'We sent you a confirmation email. Confirm it to get started.',
+  'auth.confirmEmail': 'We sent a code to {email}. Enter it below to get started.',
+  'auth.otpLabel': 'Verification code from the email',
+  'auth.otpSubmit': 'Confirm',
+  'auth.error.badCode': 'That code is wrong or expired. Check the email and try again.',
 
   'onboarding.step1.title': 'What shall we focus on?',
   'onboarding.step1.sub': 'Pick the areas that matter to you right now. You can change this later.',
