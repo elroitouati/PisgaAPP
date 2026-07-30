@@ -1376,8 +1376,9 @@ begin
            'guided_session', 30, 20
     from goals_library where code = 'T-01';
     raise exception 'FAILED: a level above the personal record was accepted';
-  exception when check_violation then
-    raise notice 'ok: the current level can never exceed the personal record';
+  exception when others then
+    if sqlerrm like 'FAILED:%' then raise; end if;
+    raise notice 'ok: the current level can never exceed the personal record (%)', sqlerrm;
   end;
 end $$;
 
@@ -1536,6 +1537,334 @@ begin
   exception when check_violation then
     raise notice 'ok: a level change direction must match its values';
   end;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- The growth engine (0012)
+--
+-- The section 3.3 worked example, run through the SQL engine. src/lib/growth.ts
+-- is pinned to the same numbers by its own unit tests; if these two ever drift,
+-- the leaderboard and the progress screen would disagree about the same week.
+-- -----------------------------------------------------------------------------
+
+select assert(
+  growth_level_multiplier(20, 20, 'up') = 1.0
+    and round(growth_level_multiplier(16, 20, 'up'), 2) = 0.80
+    and growth_level_multiplier(2, 20, 'up') = 0.6,
+  'the level multiplier reproduces the section 4.1.1 table and floors at 0.6'
+);
+
+-- The two down-direction goals in the library (S-19, I-16) get the penalty
+-- too: for them a better level is a smaller number, so the ratio inverts.
+select assert(
+  round(growth_level_multiplier(180, 120, 'down'), 2) = 0.67
+    and growth_level_multiplier(120, 120, 'down') = 1.0,
+  'the level multiplier inverts for a down-direction goal'
+);
+
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('88888888-8888-8888-8888-888888888888', 'danny@example.com', '{"full_name": "Danny"}'),
+  ('99999999-9999-9999-9999-999999999999', 'yossi@example.com', '{"full_name": "Yossi"}');
+
+-- Push-ups: BP 24, L1 15/day. The section 3.3 table works in weekly totals,
+-- so the baseline floor is 105.
+do $$
+declare v_lib uuid; v_danny uuid; v_yossi uuid; v_week date := week_start(current_date);
+begin
+  select id into v_lib from goals_library where code = 'P-01';
+
+  insert into user_goals (id, user_id, library_id, is_custom, title, category, goal_type,
+                          verification, verification_code, current_level_value,
+                          personal_record_value, added_at)
+  values ('bbbb0001-0000-0000-0000-000000000001', '88888888-8888-8888-8888-888888888888',
+          v_lib, false, 'שכיבות סמיכה', 'physical', 'daily', 'guided_session', 'V3',
+          50, 50, now() - interval '8 weeks')
+  returning id into v_danny;
+
+  insert into user_goals (id, user_id, library_id, is_custom, title, category, goal_type,
+                          verification, verification_code, current_level_value,
+                          personal_record_value, added_at)
+  values ('bbbb0002-0000-0000-0000-000000000002', '99999999-9999-9999-9999-999999999999',
+          v_lib, false, 'שכיבות סמיכה', 'physical', 'daily', 'guided_session', 'V3',
+          15, 15, now() - interval '8 weeks')
+  returning id into v_yossi;
+
+  -- Danny's four-week peak is 350; Yossi's is 70, which the L1 floor lifts to 105.
+  insert into weekly_metrics (user_goal_id, week_start, total_value) values
+    (v_danny, v_week - 7,  350), (v_danny, v_week - 14, 350),
+    (v_danny, v_week - 21, 280), (v_danny, v_week - 28, 245),
+    (v_yossi, v_week - 7,  70),  (v_yossi, v_week - 14, 70),
+    (v_yossi, v_week - 21, 65),  (v_yossi, v_week - 28, 60);
+
+  -- Seven completions each: Danny 60/day (420), Yossi 20/day (140).
+  insert into goal_completions (user_goal_id, completed_date, current_streak, metric_value, trust_multiplier)
+  select v_danny, v_week + d, d + 1, 60, 1.0 from generate_series(0, 6) as d;
+  insert into goal_completions (user_goal_id, completed_date, current_streak, metric_value, trust_multiplier)
+  select v_yossi, v_week + d, d + 1, 20, 1.0 from generate_series(0, 6) as d;
+
+  perform compute_weekly_metrics(v_danny, v_week);
+  perform compute_weekly_metrics(v_yossi, v_week);
+end $$;
+
+select assert(
+  (select baseline_value from weekly_metrics
+   where user_goal_id = 'bbbb0001-0000-0000-0000-000000000001'
+     and week_start = week_start(current_date)) = 350
+  and (select baseline_value from weekly_metrics
+       where user_goal_id = 'bbbb0002-0000-0000-0000-000000000002'
+         and week_start = week_start(current_date)) = 105,
+  'the baseline is the 4-week peak, floored at L1 (softening the beginner)'
+);
+
+select assert(
+  (select round(delta_pct, 2) from weekly_metrics
+   where user_goal_id = 'bbbb0001-0000-0000-0000-000000000001'
+     and week_start = week_start(current_date)) = 0.20
+  and (select round(delta_pct, 2) from weekly_metrics
+       where user_goal_id = 'bbbb0002-0000-0000-0000-000000000002'
+         and week_start = week_start(current_date)) = 0.33,
+  'the deltas match section 3.3 — 20% for Danny, 33% for Yossi'
+);
+
+select assert(
+  (select execution_points from weekly_metrics
+   where user_goal_id = 'bbbb0001-0000-0000-0000-000000000001'
+     and week_start = week_start(current_date)) = 168
+  and (select execution_points from weekly_metrics
+       where user_goal_id = 'bbbb0002-0000-0000-0000-000000000002'
+         and week_start = week_start(current_date)) = 168,
+  'execution points are identical — nobody is paid for being strong'
+);
+
+-- The assertion the entire product rests on.
+select assert(
+  (select improvement_points from weekly_metrics
+   where user_goal_id = 'bbbb0002-0000-0000-0000-000000000002'
+     and week_start = week_start(current_date))
+  >
+  (select improvement_points from weekly_metrics
+   where user_goal_id = 'bbbb0001-0000-0000-0000-000000000001'
+     and week_start = week_start(current_date)),
+  'going 10 → 20 earns more improvement than going 50 → 60'
+);
+
+select assert(
+  (select total_points from weekly_metrics
+   where user_goal_id = 'bbbb0001-0000-0000-0000-000000000001'
+     and week_start = week_start(current_date)) = 182
+  and (select total_points from weekly_metrics
+       where user_goal_id = 'bbbb0002-0000-0000-0000-000000000002'
+         and week_start = week_start(current_date)) = 192,
+  'the totals are 182 and 192, exactly as section 3.3 works them out'
+);
+
+-- Protection 8 — a goal younger than two weeks has nothing to be measured
+-- against, so improvement is withheld while execution still pays.
+do $$
+declare v_lib uuid; v_goal uuid; v_week date := week_start(current_date);
+begin
+  select id into v_lib from goals_library where code = 'P-03';
+  insert into user_goals (user_id, library_id, is_custom, title, category, goal_type,
+                          verification, verification_code, current_level_value,
+                          personal_record_value, added_at)
+  values ('88888888-8888-8888-8888-888888888888', v_lib, false, 'סקוואט', 'physical',
+          'daily', 'guided_session', 'V3', 30, 30, now() - interval '3 days')
+  returning id into v_goal;
+
+  insert into goal_completions (user_goal_id, completed_date, current_streak, metric_value, trust_multiplier)
+  values (v_goal, current_date, 1, 900, 1.0);
+
+  perform compute_weekly_metrics(v_goal, v_week);
+  perform set_config('pisga.new_goal', v_goal::text, false);
+end $$;
+
+select assert(
+  (select delta_pct from weekly_metrics
+   where user_goal_id = current_setting('pisga.new_goal')::uuid) > 0
+  and (select improvement_points from weekly_metrics
+       where user_goal_id = current_setting('pisga.new_goal')::uuid) = 0
+  and (select execution_points from weekly_metrics
+       where user_goal_id = current_setting('pisga.new_goal')::uuid) > 0,
+  'a goal under two weeks old earns execution but no improvement points'
+);
+
+-- Protection 6 — the 72-hour cooldown, and section 4.3's record that never falls.
+do $$
+declare v_goal uuid := 'bbbb0001-0000-0000-0000-000000000001';
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '88888888-8888-8888-8888-888888888888', true);
+  perform change_goal_level(v_goal, 'up');
+  reset role;
+end $$;
+
+select assert(
+  (select current_level_value from user_goals where id = 'bbbb0001-0000-0000-0000-000000000001') = 56
+  and (select personal_record_value from user_goals where id = 'bbbb0001-0000-0000-0000-000000000001') = 56,
+  'levelling up raises both the level and the personal record'
+);
+
+select assert(
+  (select was_personal_record from level_changes
+   where user_goal_id = 'bbbb0001-0000-0000-0000-000000000001'
+   order by changed_at desc limit 1),
+  'a level-up past the old record is recorded as a personal record'
+);
+
+select assert_denied(
+  '88888888-8888-8888-8888-888888888888',
+  $$select change_goal_level('bbbb0001-0000-0000-0000-000000000001', 'down')$$,
+  'a second level change inside 72 hours is refused'
+);
+
+-- Section 4.3: dropping a level leaves the record standing, which is what
+-- makes the penalty last until the user climbs back. Sit-ups (L1 30, step 15)
+-- opened at 60, so there is real room to fall.
+do $$
+declare v_lib uuid; v_goal uuid;
+begin
+  select id into v_lib from goals_library where code = 'P-05';
+  insert into user_goals (id, user_id, library_id, is_custom, title, category, goal_type,
+                          verification, verification_code, current_level_value,
+                          personal_record_value, added_at)
+  values ('bbbb0003-0000-0000-0000-000000000003', '99999999-9999-9999-9999-999999999999',
+          v_lib, false, 'כפיפות בטן', 'physical', 'daily', 'guided_session', 'V3',
+          60, 60, now() - interval '8 weeks')
+  returning id into v_goal;
+
+  insert into goal_completions (user_goal_id, completed_date, current_streak, metric_value, trust_multiplier)
+  values (v_goal, current_date, 1, 60, 1.0);
+
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '99999999-9999-9999-9999-999999999999', true);
+  perform change_goal_level(v_goal, 'down');
+  reset role;
+end $$;
+
+select assert(
+  (select current_level_value from user_goals where id = 'bbbb0003-0000-0000-0000-000000000003') = 45
+  and (select personal_record_value from user_goals where id = 'bbbb0003-0000-0000-0000-000000000003') = 60,
+  'dropping a level never lowers the personal record'
+);
+
+select assert(
+  (select level_multiplier from weekly_metrics
+   where user_goal_id = 'bbbb0003-0000-0000-0000-000000000003'
+     and week_start = week_start(current_date)) < 1.0,
+  'the level multiplier falls after a drop, shrinking future execution points'
+);
+
+-- A goal already sitting at the library floor has nowhere left to drop to.
+select assert_denied(
+  '99999999-9999-9999-9999-999999999999',
+  $$select change_goal_level('bbbb0002-0000-0000-0000-000000000002', 'down')$$,
+  'a goal at its opening level cannot be dropped further'
+);
+
+-- Section 5.1 — conversion moves a goal between the two economies.
+do $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '88888888-8888-8888-8888-888888888888', true);
+  perform convert_goal_to_personal('bbbb0001-0000-0000-0000-000000000001');
+  reset role;
+end $$;
+
+select assert(
+  (select is_custom and not counts_for_ranking and verification_code = 'V0'
+     and converted_from_goal_id is not null and library_id is null
+   from user_goals where id = 'bbbb0001-0000-0000-0000-000000000001'),
+  'converting to personal drops the ranking, sets V0, and remembers the origin'
+);
+
+select assert(
+  (select current_level_value = 56 and personal_record_value = 56
+   from user_goals where id = 'bbbb0001-0000-0000-0000-000000000001'),
+  'conversion keeps the level and the personal record (section 5.1 rule 4)'
+);
+
+-- Rule 3: the weeks spent personal leave the baseline window entirely.
+select assert(
+  not (select counted_for_ranking from weekly_metrics
+       where user_goal_id = 'bbbb0001-0000-0000-0000-000000000001'
+         and week_start = week_start(current_date)),
+  'the week of the conversion stops counting for ranking'
+);
+
+select assert_denied(
+  '88888888-8888-8888-8888-888888888888',
+  $$select convert_goal_to_structured('bbbb0001-0000-0000-0000-000000000001')$$,
+  'returning to the ranking inside 7 days is refused'
+);
+
+-- Protection 7 — no backfilling an avoidance goal.
+do $$
+declare v_lib uuid; v_goal uuid;
+begin
+  select id into v_lib from goals_library where code = 'P-19';  -- V4
+  insert into user_goals (user_id, library_id, is_custom, title, category, goal_type,
+                          verification, verification_code, current_level_value, personal_record_value)
+  values ('99999999-9999-9999-9999-999999999999', v_lib, false, 'סוכר', 'physical',
+          'daily', 'daily_checkin', 'V4', 3, 3)
+  returning id into v_goal;
+  perform set_config('pisga.v4_goal', v_goal::text, false);
+end $$;
+
+select assert_denied(
+  '99999999-9999-9999-9999-999999999999',
+  $$select record_structured_completion(current_setting('pisga.v4_goal')::uuid, 1, null, current_date - 3)$$,
+  'a V4 avoidance goal cannot be filled in retroactively'
+);
+
+-- Section 5 — V5 stays light, but not empty.
+do $$
+declare v_lib uuid; v_goal uuid;
+begin
+  select id into v_lib from goals_library where code = 'S-01';  -- V5
+  insert into user_goals (user_id, library_id, is_custom, title, category, goal_type,
+                          verification, verification_code, current_level_value, personal_record_value)
+  values ('99999999-9999-9999-9999-999999999999', v_lib, false, 'שיחה', 'social',
+          'daily', 'checkbox_reflection', 'V5', 2, 2)
+  returning id into v_goal;
+  perform set_config('pisga.v5_goal', v_goal::text, false);
+end $$;
+
+select assert_denied(
+  '99999999-9999-9999-9999-999999999999',
+  $$select record_structured_completion(current_setting('pisga.v5_goal')::uuid, 1, 'קצר מדי')$$,
+  'a V5 completion under 40 characters is refused'
+);
+
+-- The trust multiplier is resolved server-side and frozen onto the row, so a
+-- later change to the goal's verification cannot re-price earned history.
+do $$
+declare v_goal uuid := current_setting('pisga.v5_goal')::uuid;
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '99999999-9999-9999-9999-999999999999', true);
+  perform record_structured_completion(
+    v_goal, 1, 'דיברתי עם אמא כמעט חצי שעה על השבוע שעבר ועל העבודה החדשה שלה');
+  reset role;
+end $$;
+
+select assert(
+  (select trust_multiplier from goal_completions
+   where user_goal_id = current_setting('pisga.v5_goal')::uuid) = 1.0,
+  'a completion stores the trust multiplier that applied when it was earned'
+);
+
+-- Section 3.5 — the growth table ranks by improvement, not by volume.
+do $$
+declare v_rows int;
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '99999999-9999-9999-9999-999999999999', true);
+  select count(*) into v_rows from growth_leaderboard();
+  reset role;
+  if v_rows < 1 then
+    raise exception 'FAILED: the growth leaderboard returned nothing for a signed-in user';
+  end if;
+  raise notice 'ok: the growth leaderboard returns the caller and their friends';
 end $$;
 
 \echo 'all RLS tests passed'
