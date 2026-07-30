@@ -1310,4 +1310,232 @@ select assert(
   'finishing a deadline goal fires the notify_on_goal_completed webhook trigger'
 );
 
+-- -----------------------------------------------------------------------------
+-- Structured goals — schema invariants (0010)
+--
+-- A fresh user, because the goal-per-category limit counts everything a user
+-- already holds and the fixtures above have been adopting goals for alice
+-- since the top of this file.
+-- -----------------------------------------------------------------------------
+
+insert into auth.users (id, email, raw_user_meta_data)
+values ('77777777-7777-7777-7777-777777777777', 'gina@example.com', '{"full_name": "Gina"}');
+
+insert into goals_library
+  (slug, title_he, title_en, category, goal_type, verification, points, sort_order,
+   code, subcategory, metric_key, metric_unit, metric_direction,
+   base_points, level_1_value, level_step, verification_default, verification_allowed,
+   calibration_questions)
+values
+  ('t-pushups', 'שכיבות סמיכה', 'Push-ups', 'physical', 'daily', 'guided_session', 24, 1,
+   'T-01', 'כוח', 'reps_per_day', 'חזרות', 'up',
+   24, 15, 2, 'V3', array['V3','V1']::verification_code[], '["Q1","Q2","Q4"]'::jsonb);
+
+select assert(
+  (select verification_trust_multiplier('V2')) = 1.2
+    and (select verification_trust_multiplier('V0')) = 0.6
+    and (select verification_trust_multiplier('V5')) = 1.0,
+  'the verification trust multipliers match the section 5 catalogue'
+);
+
+-- Section 5: a structured goal is always verified.
+do $$
+begin
+  begin
+    insert into goals_library (slug, title_he, title_en, category, goal_type, verification,
+                               code, metric_key, metric_unit, metric_direction,
+                               base_points, level_1_value, level_step, verification_default)
+    values ('t-bad-v0', 'x', 'x', 'physical', 'daily', 'daily_checkin',
+            'T-99', 'k', 'u', 'up', 10, 1, 1, 'V0');
+    raise exception 'FAILED: a library goal was allowed to default to V0';
+  exception when check_violation then
+    raise notice 'ok: a library goal cannot use V0 as its verification default';
+  end;
+end $$;
+
+-- A half-specified library row would reach the engine and silently score zero.
+do $$
+begin
+  begin
+    insert into goals_library (slug, title_he, title_en, category, goal_type, verification,
+                               code, metric_key)
+    values ('t-partial', 'x', 'x', 'physical', 'daily', 'daily_checkin', 'T-98', 'k');
+    raise exception 'FAILED: a half-specified structured goal was accepted';
+  exception when check_violation then
+    raise notice 'ok: a library row is either fully specified or not structured at all';
+  end;
+end $$;
+
+-- Section 4.3: the personal record is a ceiling the current level never passes.
+do $$
+begin
+  begin
+    insert into user_goals (user_id, library_id, is_custom, title, category, goal_type,
+                            verification, current_level_value, personal_record_value)
+    select '77777777-7777-7777-7777-777777777777', id, false, 'x', 'physical', 'daily',
+           'guided_session', 30, 20
+    from goals_library where code = 'T-01';
+    raise exception 'FAILED: a level above the personal record was accepted';
+  exception when check_violation then
+    raise notice 'ok: the current level can never exceed the personal record';
+  end;
+end $$;
+
+-- Section 5.1: verification is what buys entry to the ranking, so a V0 goal
+-- is by definition personal and unranked.
+do $$
+begin
+  begin
+    insert into user_goals (user_id, is_custom, title, category, goal_type, verification,
+                            verification_code, counts_for_ranking)
+    values ('77777777-7777-7777-7777-777777777777', true, 'x', 'physical', 'daily',
+            'daily_checkin', 'V0', true);
+    raise exception 'FAILED: a V0 goal was allowed into the ranking';
+  exception when check_violation then
+    raise notice 'ok: a V0 goal cannot count for ranking';
+  end;
+
+  begin
+    insert into user_goals (user_id, library_id, is_custom, title, category, goal_type,
+                            verification, counts_for_ranking)
+    select '77777777-7777-7777-7777-777777777777', id, false, 'x', 'physical', 'daily',
+           'guided_session', false
+    from goals_library where code = 'T-01';
+    raise exception 'FAILED: a structured goal was allowed out of the ranking';
+  exception when check_violation then
+    raise notice 'ok: a structured goal always counts for ranking';
+  end;
+end $$;
+
+-- Protection 1 — five active structured goals per category, no more.
+-- A structured goal must reference the library (0001), so the six candidates
+-- need six library rows to be adopted from.
+insert into goals_library (slug, title_he, title_en, category, goal_type, verification, sort_order)
+select 't-limit-' || i, 'מטרה ' || i, 'Goal ' || i, 'academic', 'daily', 'daily_checkin', 100 + i
+from generate_series(1, 6) as i;
+
+do $$
+declare v_lib uuid;
+begin
+  for v_lib in select id from goals_library where slug like 't-limit-%' order by sort_order limit 5 loop
+    insert into user_goals (user_id, library_id, is_custom, title, category, goal_type, verification)
+    values ('77777777-7777-7777-7777-777777777777', v_lib, false, 'limit', 'academic',
+            'daily', 'daily_checkin');
+  end loop;
+  raise notice 'ok: five structured goals in a category are allowed';
+exception when others then
+  raise exception 'FAILED: five structured goals were rejected — %', sqlerrm;
+end $$;
+
+do $$
+declare v_lib uuid;
+begin
+  select id into v_lib from goals_library where slug = 't-limit-6';
+  begin
+    insert into user_goals (user_id, library_id, is_custom, title, category, goal_type, verification)
+    values ('77777777-7777-7777-7777-777777777777', v_lib, false, 'limit 6', 'academic',
+            'daily', 'daily_checkin');
+    raise exception 'FAILED: a sixth structured goal was accepted';
+  exception when others then
+    if sqlerrm like 'FAILED:%' then raise; end if;
+    raise notice 'ok: a sixth structured goal in one category is rejected (%)', sqlerrm;
+  end;
+end $$;
+
+-- Personal goals are outside that budget: converting one frees a slot.
+do $$
+begin
+  insert into user_goals (user_id, is_custom, title, category, goal_type, verification)
+  values ('77777777-7777-7777-7777-777777777777', true, 'personal extra', 'academic',
+          'daily', 'daily_checkin');
+  raise notice 'ok: personal goals do not consume the structured-goal budget';
+exception when others then
+  raise exception 'FAILED: a personal goal was counted against the limit — %', sqlerrm;
+end $$;
+
+-- Points that a client can write are points a client can forge, and these
+-- feed the friends leaderboard.
+select assert_denied(
+  '77777777-7777-7777-7777-777777777777',
+  $$insert into weekly_metrics (user_goal_id, week_start, total_points)
+    select id, week_start(current_date), 9999 from user_goals
+    where user_id = '77777777-7777-7777-7777-777777777777' limit 1$$,
+  'a client cannot insert its own weekly metrics'
+);
+
+select assert_denied(
+  '77777777-7777-7777-7777-777777777777',
+  $$insert into level_changes (user_goal_id, direction, from_value, to_value)
+    select id, 'up', 10, 20 from user_goals
+    where user_id = '77777777-7777-7777-7777-777777777777' limit 1$$,
+  'a client cannot forge a level change'
+);
+
+-- Protection 4 — no negative points anywhere, and protection 2's category
+-- ceiling is asserted per row so an uncapped value cannot be stored at all.
+do $$
+declare v_goal uuid;
+begin
+  select id into v_goal from user_goals
+  where user_id = '77777777-7777-7777-7777-777777777777' limit 1;
+
+  begin
+    insert into weekly_metrics (user_goal_id, week_start, execution_points)
+    values (v_goal, week_start(current_date), -5);
+    raise exception 'FAILED: negative points were stored';
+  exception when check_violation then
+    raise notice 'ok: points can never be negative';
+  end;
+
+  begin
+    insert into weekly_metrics (user_goal_id, week_start, improvement_points)
+    values (v_goal, week_start(current_date), 120);
+    raise exception 'FAILED: uncapped improvement points were stored';
+  exception when check_violation then
+    raise notice 'ok: improvement points are capped at 100 per row';
+  end;
+
+  begin
+    insert into weekly_metrics (user_goal_id, week_start, level_multiplier)
+    values (v_goal, week_start(current_date), 0.4);
+    raise exception 'FAILED: a level multiplier below the 0.6 floor was stored';
+  exception when check_violation then
+    raise notice 'ok: the level multiplier floor of 0.6 holds';
+  end;
+end $$;
+
+-- One row per goal per week: the baseline reads this table's own history, and
+-- a duplicate week would corrupt every Δ computed after it.
+do $$
+declare v_goal uuid; v_week date := week_start(current_date);
+begin
+  select id into v_goal from user_goals
+  where user_id = '77777777-7777-7777-7777-777777777777' limit 1;
+
+  insert into weekly_metrics (user_goal_id, week_start, total_value) values (v_goal, v_week, 10);
+  begin
+    insert into weekly_metrics (user_goal_id, week_start, total_value) values (v_goal, v_week, 20);
+    raise exception 'FAILED: two metric rows were stored for the same goal-week';
+  exception when unique_violation then
+    raise notice 'ok: a goal has at most one metrics row per week';
+  end;
+end $$;
+
+-- Section 4.1: a level change has to actually change something, and its
+-- recorded direction has to match the numbers.
+do $$
+declare v_goal uuid;
+begin
+  select id into v_goal from user_goals
+  where user_id = '77777777-7777-7777-7777-777777777777' limit 1;
+
+  begin
+    insert into level_changes (user_goal_id, direction, from_value, to_value)
+    values (v_goal, 'up', 10, 8);
+    raise exception 'FAILED: an "up" change that lowered the level was accepted';
+  exception when check_violation then
+    raise notice 'ok: a level change direction must match its values';
+  end;
+end $$;
+
 \echo 'all RLS tests passed'
