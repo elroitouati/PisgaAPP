@@ -1276,16 +1276,16 @@ select assert_denied(
 
 select assert(
   exists (
-    select 1 from supabase_functions.http_request_log
-    where table_name = 'messages'
+    select 1 from net.http_post_log
+    where body->>'table' = 'messages'
   ),
   'sending a message fires the notify_on_message webhook trigger'
 );
 
 select assert(
   exists (
-    select 1 from supabase_functions.http_request_log
-    where table_name = 'user_badges'
+    select 1 from net.http_post_log
+    where body->>'table' = 'user_badges'
   ),
   'earning a badge fires the notify_on_badge_earned webhook trigger'
 );
@@ -1304,8 +1304,8 @@ end $$;
 
 select assert(
   exists (
-    select 1 from supabase_functions.http_request_log
-    where table_name = 'user_goals'
+    select 1 from net.http_post_log
+    where body->>'table' = 'user_goals'
   ),
   'finishing a deadline goal fires the notify_on_goal_completed webhook trigger'
 );

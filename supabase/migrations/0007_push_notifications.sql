@@ -93,10 +93,17 @@ revoke execute on function notification_recipients_for_message(uuid) from public
 grant execute on function notification_recipients_for_message(uuid) to service_role;
 
 -- -----------------------------------------------------------------------------
--- Webhook triggers — fire supabase_functions.http_request, the same trigger
--- function the Dashboard's "Database Webhooks" UI generates, so this can be
--- edited by hand or regenerated there. It POSTs a payload shaped like
--- { type, table, schema, record, old_record } to the given URL.
+-- Webhook triggers
+--
+-- These POST to notify-event, which decides who gets the notification and in
+-- which language.
+--
+-- They do NOT use supabase_functions.http_request, which is what the
+-- Dashboard's "Database Webhooks" UI generates. That schema does not exist on
+-- a fresh project — the Dashboard creates it the first time you add a webhook
+-- there — so depending on it makes this migration unrunnable on a new project
+-- and ties the schema to a manual click. We dispatch through pg_net instead,
+-- which a migration can enable itself.
 --
 -- ⚠ Fill in <PROJECT_REF> and <WEBHOOK_SECRET> before running this migration
 -- against a real project (see README "הקמת Supabase"). The secret is checked
@@ -105,36 +112,74 @@ grant execute on function notification_recipients_for_message(uuid) to service_r
 -- database trigger has no user session to authenticate with.
 -- -----------------------------------------------------------------------------
 
+-- Wrapped: on a database where pg_net cannot be installed the app must still
+-- deploy in full. Push is a feature, not a prerequisite.
+do $$
+begin
+  create extension if not exists pg_net;
+exception when others then
+  raise warning 'pg_net unavailable, push notifications will not dispatch: %', sqlerrm;
+end $$;
+
+/**
+ * Trigger function behind every push notification.
+ *
+ * Takes the endpoint and the shared secret as trigger arguments so the three
+ * triggers below share one implementation, and builds the same payload shape
+ * the Dashboard's webhook generator does ({ type, table, record }) — which is
+ * what notify-event already parses.
+ *
+ * The dispatch is deliberately swallowed on failure. A notification that
+ * cannot be sent must never roll back the thing that earned it: without this,
+ * an unreachable endpoint or a missing pg_net would make every badge insert
+ * and every chat message fail.
+ */
+create or replace function notify_event_webhook()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  begin
+    perform net.http_post(
+      url     := tg_argv[0],
+      headers := jsonb_build_object(
+                   'Content-Type', 'application/json',
+                   'x-webhook-secret', tg_argv[1]),
+      body    := jsonb_build_object(
+                   'type', tg_op,
+                   'table', tg_table_name,
+                   'record', to_jsonb(new))
+    );
+  exception when others then
+    raise warning 'notify_event_webhook(%) failed: %', tg_table_name, sqlerrm;
+  end;
+  return null;
+end;
+$$;
+
 create trigger notify_on_badge_earned
   after insert on user_badges
-  for each row execute function supabase_functions.http_request(
+  for each row execute function notify_event_webhook(
     'https://<PROJECT_REF>.functions.supabase.co/notify-event',
-    'POST',
-    '{"Content-Type":"application/json","x-webhook-secret":"<WEBHOOK_SECRET>"}',
-    '{}',
-    '5000'
+    '<WEBHOOK_SECRET>'
   );
 
 create trigger notify_on_goal_completed
   after update on user_goals
   for each row
   when (new.completed_at is not null and old.completed_at is null)
-  execute function supabase_functions.http_request(
+  execute function notify_event_webhook(
     'https://<PROJECT_REF>.functions.supabase.co/notify-event',
-    'POST',
-    '{"Content-Type":"application/json","x-webhook-secret":"<WEBHOOK_SECRET>"}',
-    '{}',
-    '5000'
+    '<WEBHOOK_SECRET>'
   );
 
 create trigger notify_on_message
   after insert on messages
   for each row
   when (new.deleted_at is null)
-  execute function supabase_functions.http_request(
+  execute function notify_event_webhook(
     'https://<PROJECT_REF>.functions.supabase.co/notify-event',
-    'POST',
-    '{"Content-Type":"application/json","x-webhook-secret":"<WEBHOOK_SECRET>"}',
-    '{}',
-    '5000'
+    '<WEBHOOK_SECRET>'
   );

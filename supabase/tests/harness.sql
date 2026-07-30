@@ -75,37 +75,17 @@ as $$
   select string_to_array(name, '/');
 $$;
 
--- Minimal stand-in for the Dashboard's Database Webhooks trigger function
--- (supabase_functions.http_request), used by 0007_push_notifications.sql. The
--- real one fires an async HTTP POST via pg_net; this just logs that it would
--- have, so tests can assert a trigger fired without a live Edge Function.
-create schema if not exists supabase_functions;
-grant usage on schema supabase_functions to anon, authenticated, service_role;
-alter default privileges in schema supabase_functions grant all on tables to anon, authenticated, service_role;
-
-create table if not exists supabase_functions.http_request_log (
-  id         uuid primary key default gen_random_uuid(),
-  url        text not null,
-  table_name text not null,
-  op         text not null,
-  logged_at  timestamptz not null default now()
-);
-
-create or replace function supabase_functions.http_request()
-returns trigger
-language plpgsql
-as $$
-begin
-  insert into supabase_functions.http_request_log (url, table_name, op)
-  values (TG_ARGV[0], TG_TABLE_NAME, TG_OP);
-  return coalesce(new, old);
-end;
-$$;
-
--- Minimal stand-in for pg_net (net.http_post), used directly by
--- redeem_invite() in 0008_group_admins.sql — that call has no trigger
--- context to log through supabase_functions.http_request, so it needs its
--- own log table.
+-- Minimal stand-in for pg_net (net.http_post), which every notification
+-- dispatch goes through — the triggers in 0007 and redeem_invite() in 0008.
+-- The real extension cannot be installed in this container, so this logs what
+-- would have been posted and the tests assert against the log.
+--
+-- There is deliberately NO stand-in for supabase_functions.http_request, the
+-- Dashboard's webhook trigger function. Providing one is what let 0007 ship
+-- depending on a schema that does not exist on a fresh Supabase project: every
+-- test passed here and the very first paste into a real project failed. A stub
+-- may stand in for something the container cannot install; it must never
+-- manufacture a dependency the migrations are supposed to bring themselves.
 create schema if not exists net;
 grant usage on schema net to anon, authenticated, service_role;
 alter default privileges in schema net grant all on tables to anon, authenticated, service_role;

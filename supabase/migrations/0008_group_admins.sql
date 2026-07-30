@@ -325,14 +325,22 @@ begin
   returning (xmax = 0) into v_inserted;
 
   if v_inserted then
-    perform net.http_post(
-      url := 'https://<PROJECT_REF>.functions.supabase.co/notify-event',
-      headers := '{"Content-Type":"application/json","x-webhook-secret":"<WEBHOOK_SECRET>"}'::jsonb,
-      body := jsonb_build_object(
-        'table', 'friendships',
-        'record', jsonb_build_object('owner_id', v_owner, 'joiner_id', auth.uid())
-      )
-    );
+    -- Swallowed for the same reason as notify_event_webhook in 0007: a
+    -- notification that cannot be sent must not fail the thing it announces.
+    -- Without this, an unreachable endpoint would make the invite link itself
+    -- stop working.
+    begin
+      perform net.http_post(
+        url := 'https://<PROJECT_REF>.functions.supabase.co/notify-event',
+        headers := '{"Content-Type":"application/json","x-webhook-secret":"<WEBHOOK_SECRET>"}'::jsonb,
+        body := jsonb_build_object(
+          'table', 'friendships',
+          'record', jsonb_build_object('owner_id', v_owner, 'joiner_id', auth.uid())
+        )
+      );
+    exception when others then
+      raise warning 'invite-accepted notification failed: %', sqlerrm;
+    end;
   end if;
 
   select * into v_owner_profile from profiles where id = v_owner;
