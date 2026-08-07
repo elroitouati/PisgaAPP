@@ -25,7 +25,7 @@ import {
   type HealthSourceRow,
 } from '@/lib/health'
 import { Spinner } from '@/components/Spinner'
-import { PrimaryButton } from '@/components/ui'
+import { LoadingScreen, PrimaryButton } from '@/components/ui'
 
 /**
  * VS1–VS8 — the eight verification screens (designs 14a–15h).
@@ -83,9 +83,7 @@ export default function Verify() {
   // screen used to spin forever the moment someone pressed "start".
   if (!goal) {
     return (
-      <main className="flex min-h-dvh items-center justify-center">
-        <Spinner className="size-7" />
-      </main>
+      <LoadingScreen />
     )
   }
 

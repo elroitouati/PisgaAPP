@@ -21,7 +21,7 @@ import { BackIcon, GearIcon, WarningIcon } from '@/components/icons'
 import { GoalRing } from '@/components/goals/GoalRing'
 import { formatValue } from '@/lib/formatValue'
 import { Spinner } from '@/components/Spinner'
-import { PrimaryButton } from '@/components/ui'
+import { LoadingScreen, PrimaryButton } from '@/components/ui'
 
 /**
  * S1 — the goal card (design 11a/11b), and the two modals that hang off it:
@@ -101,9 +101,7 @@ export default function GoalCard() {
   // `library`, so this screen never got past its own loading state.
   if (!goal) {
     return (
-      <main className="flex min-h-dvh items-center justify-center">
-        <Spinner className="size-7" />
-      </main>
+      <LoadingScreen />
     )
   }
 

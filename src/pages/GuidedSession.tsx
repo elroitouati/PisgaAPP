@@ -6,7 +6,7 @@ import { useTrackedGoals } from '@/hooks/useGoals'
 import { formatClock, useGuidedSession } from '@/hooks/useGuidedSession'
 import { CATEGORY_META, categoryStyle } from '@/lib/categories'
 import { CloseIcon, PauseIcon, PlayIcon, RestartIcon } from '@/components/icons'
-import { Card } from '@/components/ui'
+import { Card, LoadingScreen } from '@/components/ui'
 import { Spinner } from '@/components/Spinner'
 
 const RING = 248
@@ -22,13 +22,9 @@ export default function GuidedSession() {
 
   const goal = goals.find((candidate) => candidate.id === goalId)
 
-  if (loading) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center">
-        <Spinner className="size-8" />
-      </div>
-    )
-  }
+  // This was a bare spinner with no way out — exactly "the start of a task"
+  // a slow connection or a hung request could strand someone on.
+  if (loading) return <LoadingScreen />
   if (!goal) return <Navigate to="/404" replace />
 
   return (

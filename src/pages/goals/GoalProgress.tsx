@@ -10,8 +10,7 @@ import {
 } from '@/lib/structuredGoals'
 import { BackIcon } from '@/components/icons'
 import { formatValue } from '@/lib/formatValue'
-import { Spinner } from '@/components/Spinner'
-import { EmptyState } from '@/components/ui'
+import { EmptyState, LoadingScreen } from '@/components/ui'
 
 /**
  * S4 — progress and growth (design 12a/12b).
@@ -37,9 +36,7 @@ export default function GoalProgress() {
 
   if (!goal || !goal.library) {
     return (
-      <main className="flex min-h-dvh items-center justify-center">
-        <Spinner className="size-7" />
-      </main>
+      <LoadingScreen />
     )
   }
 

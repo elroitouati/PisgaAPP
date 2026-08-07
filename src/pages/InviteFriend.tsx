@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
+import { Share } from '@capacitor/share'
 import { useI18n } from '@/i18n/useI18n'
 import { useAsync } from '@/hooks/useAsync'
 import { fetchMyInviteCode, regenerateInviteCode, type InviteCode } from '@/lib/api'
@@ -25,8 +27,19 @@ export default function InviteFriend() {
   }
 
   async function nativeShare() {
-    if (navigator.share) await navigator.share({ url: link, text: t('invite.headline') })
-    else void copyLink()
+    // navigator.share's support inside Android's WebView component has real
+    // gaps across vendors/versions — not guaranteed the way it is in a full
+    // mobile browser. @capacitor/share calls the OS share sheet directly, so
+    // it is what actually gets this in front of "any network," which is the
+    // whole point of the button; navigator.share is a fine fallback for the
+    // plain web build, where it works.
+    if (Capacitor.isNativePlatform()) {
+      await Share.share({ url: link, text: t('invite.headline') })
+    } else if (navigator.share) {
+      await navigator.share({ url: link, text: t('invite.headline') })
+    } else {
+      void copyLink()
+    }
   }
 
   async function regenerate() {

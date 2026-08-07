@@ -11,7 +11,7 @@ import {
   type WeekSummary,
 } from '@/lib/structuredGoals'
 import { BackIcon } from '@/components/icons'
-import { Spinner } from '@/components/Spinner'
+import { LoadingScreen } from '@/components/ui'
 
 /** Sunday-start, matching week_start() in the database. */
 function currentWeekStart(): string {
@@ -45,9 +45,7 @@ export default function WeeklySummary() {
 
   if (!summary) {
     return (
-      <main className="flex min-h-dvh items-center justify-center">
-        <Spinner className="size-7" />
-      </main>
+      <LoadingScreen />
     )
   }
 

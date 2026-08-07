@@ -76,8 +76,15 @@ export default function Friends() {
             {friends.length} {t('friends.count')}
           </p>
         </div>
+        {/* Had no onClick at all — a real dead button, not a UX quibble. The
+            invite-link screen is the app's one existing way to add a
+            friend; friends-of-friends suggestions and search-by-name are
+            both new features (the latter has real discoverability/privacy
+            implications — should any user be findable by name by anyone?)
+            and need a product decision, not a UI wire-up. */}
         <button
           type="button"
+          onClick={() => navigate('/profile/invite')}
           aria-label={t('friends.add')}
           className="border-line text-fg flex size-[38px] items-center justify-center rounded-full border"
         >

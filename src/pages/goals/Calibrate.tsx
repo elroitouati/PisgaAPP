@@ -15,7 +15,7 @@ import {
 import { formatValue } from '@/lib/formatValue'
 import { MinusIcon, PlusIcon } from '@/components/icons'
 import { Spinner } from '@/components/Spinner'
-import { PrimaryButton } from '@/components/ui'
+import { LoadingScreen, PrimaryButton } from '@/components/ui'
 
 const WEEKDAYS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש']
 const TIMES = ['sg.morning', 'sg.noon', 'sg.afternoon', 'sg.evening'] as const
@@ -74,9 +74,7 @@ export default function Calibrate() {
 
   if (!library) {
     return (
-      <main className="flex min-h-dvh items-center justify-center">
-        <Spinner className="size-7" />
-      </main>
+      <LoadingScreen />
     )
   }
 

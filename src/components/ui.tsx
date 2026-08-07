@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { CATEGORY_META, categoryStyle, type Category } from '@/lib/categories'
 import { useI18n } from '@/i18n/useI18n'
-import { WarningIcon } from '@/components/icons'
+import { BackIcon, WarningIcon } from '@/components/icons'
 import { Spinner } from '@/components/Spinner'
 
 /** The card surface used across every screen in the handoff. */
@@ -190,6 +191,33 @@ export function ConfirmSheet({
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * The full-screen spinner every goal screen shows while its data loads —
+ * with a way out. Six screens across the structured-goals flow (GoalCard,
+ * Verify, Calibrate, GoalProgress, WeeklySummary) plus GuidedSession used a
+ * bare spinner with no back button here: on a slow connection, or a request
+ * that never resolves, there was nothing on screen to tap. The OS back
+ * gesture still worked underneath it, but nothing on screen told anyone that.
+ */
+export function LoadingScreen() {
+  const { t } = useI18n()
+  const navigate = useNavigate()
+  return (
+    <main className="relative flex min-h-dvh items-center justify-center">
+      <button
+        type="button"
+        onClick={() => navigate(-1)}
+        aria-label={t('common.back')}
+        className="text-fg-muted absolute start-[22px] flex"
+        style={{ top: 'calc(1.25rem + env(safe-area-inset-top))' }}
+      >
+        <BackIcon size={21} />
+      </button>
+      <Spinner className="size-7" />
+    </main>
   )
 }
 

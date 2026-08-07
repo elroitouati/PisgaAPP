@@ -13,6 +13,25 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="פסגה" />
     <title>פסגה</title>
+
+    <!-- Social link preview (WhatsApp, iMessage, Slack, Twitter/X...). There
+         was no og:* here at all before — an invite link pasted anywhere
+         showed no preview card, just a bare URL. This is one static card for
+         every route (this is a client-side SPA — every path serves this same
+         index.html), not a personalized "so-and-so invited you" preview:
+         that needs server-side rendering per /join/:token, which needs a
+         hosting decision that hasn't been made yet. og:image uses a
+         root-relative path so it resolves correctly on whichever domain this
+         ends up deployed to. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="פסגה" />
+    <meta property="og:title" content="פסגה — מטרה קטנה כל יום" />
+    <meta property="og:description" content="הצטרפו אליי למטרה משותפת בפסגה — שינוי גדול נבנה מהצעדים הקטנים." />
+    <meta property="og:image" content="/brand/og-share.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="פסגה — מטרה קטנה כל יום" />
+    <meta name="twitter:description" content="הצטרפו אליי למטרה משותפת בפסגה — שינוי גדול נבנה מהצעדים הקטנים." />
+    <meta name="twitter:image" content="/brand/og-share.png" />
     <script>
       // Applied before first paint so the app never flashes the wrong theme/direction.
       (function () {
