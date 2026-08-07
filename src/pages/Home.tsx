@@ -147,8 +147,12 @@ function DailyQuote({ lang }: { lang: 'he' | 'en' }) {
   const quote = quoteOfTheDay()
   return (
     // The accent rule sits on the reading-start edge — right in Hebrew, left
-    // once the app is switched to English.
-    <blockquote className="border-line bg-surface text-fg-muted mt-auto rounded-xl border border-s-2 border-s-[var(--color-fg-subtle)] px-[15px] py-[13px] text-[13.5px] leading-relaxed">
+    // once the app is switched to English. Was mt-auto, which collapses to 0
+    // when the category list already fills the screen, leaving this flush
+    // against the last card (the "personal" tile, being last in CATEGORIES).
+    // A fixed floor trades away "pinned to the very bottom on a short list"
+    // for "never flush", which is the one that was actually bothering people.
+    <blockquote className="border-line bg-surface text-fg-muted mt-5 rounded-xl border border-s-2 border-s-[var(--color-fg-subtle)] px-[15px] py-[13px] text-[13.5px] leading-relaxed">
       {lang === 'he' ? quote.he : quote.en}
       <footer className="text-fg-subtle mt-1.5 text-[12px]">
         {lang === 'he' ? quote.authorHe : quote.authorEn}

@@ -131,6 +131,17 @@ export async function archiveGoal(goalId: string): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
+/**
+ * Permanently removes a goal, not just hides it — archiveGoal for when the
+ * user actually wants it gone rather than out of the way. goal_completions,
+ * goal_milestones, weekly_metrics and level_changes all reference user_goals
+ * with `on delete cascade`, so its history goes with it; there is no undo.
+ */
+export async function deleteGoal(goalId: string): Promise<void> {
+  const { error } = await supabase.from('user_goals').delete().eq('id', goalId)
+  if (error) throw new Error(error.message)
+}
+
 // ── Daily tracking ───────────────────────────────────────────────────────────
 
 /**

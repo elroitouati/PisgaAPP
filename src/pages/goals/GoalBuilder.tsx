@@ -104,12 +104,20 @@ export default function GoalBuilder() {
       // they are set after creation rather than through the legacy helper.
       // counts_for_ranking is already false — createCustomGoal sets it, which
       // is what makes the V0 option below legal against the DB constraint.
+      //
+      // personal_metric_unit/personal_level_step are what step 2 and step 4
+      // of this wizard actually collected — without persisting them here,
+      // GoalCard and Verify had nowhere to read a from-scratch goal's metric
+      // or level step from, which is what made opening one spin forever.
       await supabase
         .from('user_goals')
         .update({
           verification_code: verification,
           current_level_value: 1,
           personal_record_value: 1,
+          personal_metric_unit: metricUnit,
+          personal_metric_direction: 'up',
+          personal_level_step: levelStep,
         })
         .eq('id', goal.id)
       navigate(`/goal/${goal.id}`, { replace: true })

@@ -20,7 +20,6 @@ export default function Library() {
   const { user } = useAuth()
   const navigate = useNavigate()
 
-  const [tab, setTab] = useState<Category>('physical')
   // The calendar timeline's empty-state CTA lands here with the deadline form
   // already open. Everything else now goes to the builder at /goal/new — the
   // inline form is kept only because it is the one place a target date can be
@@ -28,6 +27,14 @@ export default function Library() {
   const [params] = useSearchParams()
   const [showCustom, setShowCustom] = useState(params.get('new') === '1')
   const defaultLongTerm = params.get('longTerm') === '1'
+  // CategoryScreen's "add structured goals" empty-state CTA passes ?category=
+  // so this opens on the tab the user was actually looking at.
+  const paramCategory = params.get('category')
+  const [tab, setTab] = useState<Category>(
+    paramCategory && CATEGORIES.includes(paramCategory as Category)
+      ? (paramCategory as Category)
+      : 'physical',
+  )
 
   const library = useAsync<LibraryGoal[]>(() => fetchLibrary(), [])
   const mine = useAsync(

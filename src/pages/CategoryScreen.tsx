@@ -1,4 +1,4 @@
-import { Link, Navigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useI18n } from '@/i18n/useI18n'
 import { useTrackedGoals } from '@/hooks/useGoals'
 import { CATEGORIES, CATEGORY_META, categoryStyle, type Category } from '@/lib/categories'
@@ -16,6 +16,7 @@ import { Spinner } from '@/components/Spinner'
 export default function CategoryScreen() {
   const { category } = useParams<{ category: string }>()
   const { t } = useI18n()
+  const navigate = useNavigate()
   const { goals, loading, error, reload, complete, undo } = useTrackedGoals()
   const { points: monthlyPoints } = useMonthlyPoints(
     CATEGORIES.includes(category as Category) ? (category as Category) : undefined,
@@ -87,6 +88,8 @@ export default function CategoryScreen() {
             label={t('cat.structured')}
             goals={structured}
             emptyLabel={t('cat.emptyStructured')}
+            actionLabel={t('cat.addStructured')}
+            onAction={() => navigate(`/library?category=${key}`)}
             onComplete={complete}
             onUndo={undo}
           />
@@ -94,6 +97,8 @@ export default function CategoryScreen() {
             label={t('cat.personal')}
             goals={personal}
             emptyLabel={t('cat.emptyPersonal')}
+            actionLabel={t('cat.addPersonal')}
+            onAction={() => navigate('/goal/new')}
             onComplete={complete}
             onUndo={undo}
           />
@@ -107,12 +112,16 @@ function Group({
   label,
   goals,
   emptyLabel,
+  actionLabel,
+  onAction,
   onComplete,
   onUndo,
 }: {
   label: string
   goals: ReturnType<typeof useTrackedGoals>['goals']
   emptyLabel: string
+  actionLabel: string
+  onAction: () => void
   onComplete: (goalId: string, note?: string | null) => Promise<void>
   onUndo: (goalId: string) => Promise<void>
 }) {
@@ -122,7 +131,9 @@ function Group({
         <SectionLabel>{label}</SectionLabel>
       </div>
       {goals.length === 0 ? (
-        <EmptyState>{emptyLabel}</EmptyState>
+        <EmptyState actionLabel={actionLabel} onAction={onAction}>
+          {emptyLabel}
+        </EmptyState>
       ) : (
         <div className="flex flex-col gap-2.5">
           {goals.map((goal) => (

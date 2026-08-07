@@ -6,6 +6,7 @@ import { useAsync } from '@/hooks/useAsync'
 import { categoryStyle, CATEGORY_META } from '@/lib/categories'
 import { supabase } from '@/lib/supabase'
 import {
+  effectiveLibrary,
   fetchStructuredGoal,
   recordStructuredCompletion,
   type LibraryGoalRow,
@@ -76,7 +77,11 @@ export default function Verify() {
     }
   }
 
-  if (!goal || !goal.library) {
+  // Only `goal` is required — see effectiveLibrary() for why `goal.library`
+  // itself is no longer a hard requirement. This was the same bug as
+  // GoalCard's: a from-scratch personal goal has no library row, so this
+  // screen used to spin forever the moment someone pressed "start".
+  if (!goal) {
     return (
       <main className="flex min-h-dvh items-center justify-center">
         <Spinner className="size-7" />
@@ -84,7 +89,7 @@ export default function Verify() {
     )
   }
 
-  const library = goal.library
+  const library = effectiveLibrary(goal)
   const target = goal.current_level_value ?? library.level_1_value
   const shared = { goal, library, target, saving, submit }
   // What the goal is being completed with right now, which is what decides

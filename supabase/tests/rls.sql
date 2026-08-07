@@ -1531,8 +1531,11 @@ begin
   where user_id = '77777777-7777-7777-7777-777777777777' limit 1;
 
   begin
-    insert into level_changes (user_goal_id, direction, from_value, to_value)
-    values (v_goal, 'up', 10, 8);
+    -- metric_direction supplied explicitly (0017): the constraint now reads
+    -- against it rather than assuming direction='up' always means the raw
+    -- value rose, so this insert has to say which convention it is testing.
+    insert into level_changes (user_goal_id, direction, from_value, to_value, metric_direction)
+    values (v_goal, 'up', 10, 8, 'up');
     raise exception 'FAILED: an "up" change that lowered the level was accepted';
   exception when check_violation then
     raise notice 'ok: a level change direction must match its values';
@@ -2152,6 +2155,171 @@ begin
     raise exception 'FAILED: my_health_goals leaked % goal(s) to another user', v_theirs;
   end if;
   raise notice 'ok: my_health_goals returns the caller''s sensor goals and nobody else''s';
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- change_goal_level on a down-direction goal (0017)
+--
+-- Pre-existing bug, unrelated to personal goals: the reversal guard checked
+-- p_direction alone, which only reads correctly for an up-direction metric.
+-- An ordinary, nowhere-near-any-clamp "easy for me" press on any
+-- down-direction goal (S-19, I-16) has always failed with "this goal is
+-- already at its opening level" — confirmed against a throwaway Postgres
+-- before writing this fix, not assumed.
+-- -----------------------------------------------------------------------------
+
+do $$
+declare v_lib uuid; v_goal uuid; v_after record;
+begin
+  select id into v_lib from goals_library where code = 'S-19';  -- down-direction, screen time
+  insert into user_goals (user_id, library_id, is_custom, title, category, goal_type,
+                          verification, verification_code, current_level_value, personal_record_value)
+  -- S-19's level_1_value (90) is the beginner CEILING for a down-direction
+  -- goal — current_level_value must start at or below it, same invariant
+  -- level_never_exceeds_personal_record and the library data itself keep
+  -- everywhere else. Starting here is what makes this an ordinary,
+  -- nowhere-near-any-clamp press rather than an accidental second test of
+  -- the ceiling clamp.
+  values ('99999999-9999-9999-9999-999999999999', v_lib, false, 'מסך שני', 'social',
+          'daily', 'guided_session', 'V7', 90, 90)
+  returning id into v_goal;
+
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '99999999-9999-9999-9999-999999999999', true);
+  select * into v_after from change_goal_level(v_goal, 'up');  -- "up" = better = lower, for a down goal
+  reset role;
+
+  if v_after.current_level_value <> 75 then
+    raise exception 'FAILED: expected level 75 (90 - step 15) after an ordinary down-direction improve, got %',
+      v_after.current_level_value;
+  end if;
+  raise notice 'ok: easy-for-me works on a down-direction goal nowhere near its ceiling (was always broken before 0017)';
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- From-scratch personal goals (0016 + 0017)
+--
+-- Built through S5 (GoalBuilder): is_custom, no library_id, no
+-- converted_from_goal_id — the exact shape that used to leave GoalCard
+-- spinning forever (no library to read from) and change_goal_level
+-- refusing every level press ("this goal has no level to change").
+-- -----------------------------------------------------------------------------
+
+do $$
+declare v_goal uuid;
+begin
+  insert into user_goals (
+    user_id, is_custom, title, category, goal_type, verification,
+    verification_code, current_level_value, personal_record_value,
+    counts_for_ranking, personal_metric_unit, personal_metric_direction,
+    personal_level_step, personal_base_points
+  )
+  values (
+    '99999999-9999-9999-9999-999999999999', true, 'שכיבות סמיכה משלי', 'physical',
+    'daily', 'checkbox_reflection', 'V3', 10, 10, false, 'חזרות', 'up', 5, 0
+  )
+  returning id into v_goal;
+  perform set_config('pisga.personal_goal', v_goal::text, false);
+end $$;
+
+select assert(
+  (select personal_metric_unit = 'חזרות' and personal_level_step = 5
+   from user_goals where id = current_setting('pisga.personal_goal')::uuid),
+  'a from-scratch personal goal keeps the metric it was built with'
+);
+
+do $$
+declare v_after record;
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '99999999-9999-9999-9999-999999999999', true);
+  select * into v_after from change_goal_level(current_setting('pisga.personal_goal')::uuid, 'up');
+  reset role;
+  if v_after.current_level_value <> 15 then
+    raise exception 'FAILED: expected level 15 after raising a personal goal with step 5 from 10, got %',
+      v_after.current_level_value;
+  end if;
+  raise notice 'ok: change_goal_level raises a from-scratch personal goal with no library row';
+end $$;
+
+do $$
+declare v_after record;
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '99999999-9999-9999-9999-999999999999', true);
+  -- 72h cooldown just fired above, so this must be refused, not silently allowed.
+  begin
+    perform change_goal_level(current_setting('pisga.personal_goal')::uuid, 'down');
+    reset role;
+    raise exception 'FAILED: a second level change inside 72 hours was accepted';
+  exception when others then
+    reset role;
+    if sqlerrm not like '%72 hours%' then
+      raise exception 'FAILED: wrong error for a cooldown re-press: %', sqlerrm;
+    end if;
+    raise notice 'ok: the 72-hour cooldown still applies to a from-scratch personal goal';
+  end;
+end $$;
+
+-- A `down`-direction personal goal must never clamp to a negative level.
+do $$
+declare v_goal uuid; v_after record;
+begin
+  insert into user_goals (
+    user_id, is_custom, title, category, goal_type, verification,
+    verification_code, current_level_value, personal_record_value,
+    counts_for_ranking, personal_metric_unit, personal_metric_direction,
+    personal_level_step, personal_base_points
+  )
+  values (
+    '99999999-9999-9999-9999-999999999999', true, 'פחות זמן מסך משלי', 'personal',
+    'daily', 'checkbox_reflection', 'V1', 15, 15, false, 'שעות', 'down', 5, 0
+  )
+  returning id into v_goal;
+  perform set_config('pisga.personal_down_goal', v_goal::text, false);
+
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '99999999-9999-9999-9999-999999999999', true);
+  select * into v_after from change_goal_level(v_goal, 'up');  -- "up" = better = lower, for a down goal
+  reset role;
+
+  -- 15 - step 5 = 10, well above the floor (one step = 5, since there is no
+  -- library level_1_value to floor at instead) — so this is an ordinary,
+  -- unclamped move, not the clamp itself.
+  if v_after.current_level_value <> 10 then
+    raise exception 'FAILED: expected level 10 (15 - step 5), got %', v_after.current_level_value;
+  end if;
+  raise notice 'ok: a down-direction personal goal can fall an ordinary step with no library row';
+end $$;
+
+-- The clamp itself, on a separate fresh goal (the first is inside its own
+-- 72h cooldown now): starting one step from the floor, a press must land
+-- exactly on the floor rather than overshoot toward zero — which
+-- user_goals.current_level_value's own > 0 check would reject outright.
+do $$
+declare v_goal uuid; v_after record;
+begin
+  insert into user_goals (
+    user_id, is_custom, title, category, goal_type, verification,
+    verification_code, current_level_value, personal_record_value,
+    counts_for_ranking, personal_metric_unit, personal_metric_direction,
+    personal_level_step, personal_base_points
+  )
+  values (
+    '99999999-9999-9999-9999-999999999999', true, 'פחות זמן מסך משלי 2', 'personal',
+    'daily', 'checkbox_reflection', 'V1', 6, 6, false, 'שעות', 'down', 5, 0
+  )
+  returning id into v_goal;
+
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claim.sub', '99999999-9999-9999-9999-999999999999', true);
+  select * into v_after from change_goal_level(v_goal, 'up');
+  reset role;
+
+  if v_after.current_level_value <> 5 then
+    raise exception 'FAILED: expected the floor (5, one level step) not %', v_after.current_level_value;
+  end if;
+  raise notice 'ok: a down-direction personal goal floors at one level step, never at zero';
 end $$;
 
 \echo 'all RLS tests passed'

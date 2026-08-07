@@ -8,13 +8,14 @@ import {
   fetchManagedGoals,
   archiveGoal,
   unarchiveGoal,
+  deleteGoal,
   type ActiveChallenge,
   type ManagedGoal,
 } from '@/lib/api'
 import { CATEGORIES, CATEGORY_META, categoryStyle } from '@/lib/categories'
 import { todayKey } from '@/lib/dates'
-import { BackIcon, ArchiveIcon, UnarchiveIcon } from '@/components/icons'
-import { EmptyState, SectionLabel } from '@/components/ui'
+import { BackIcon, ArchiveIcon, UnarchiveIcon, TrashIcon } from '@/components/icons'
+import { ConfirmSheet, EmptyState, SectionLabel } from '@/components/ui'
 import { Spinner } from '@/components/Spinner'
 
 type Tab = 'active' | 'archived'
@@ -26,6 +27,7 @@ export default function MyGoals() {
   const navigate = useNavigate()
   const [tab, setTab] = useState<Tab>('active')
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<ManagedGoal | null>(null)
 
   const { data, loading, patch } = useAsync<ManagedGoal[]>(
     () => (user ? fetchManagedGoals(user.id, tab === 'active') : Promise.resolve([])),
@@ -48,6 +50,18 @@ export default function MyGoals() {
         await unarchiveGoal(goal.id)
       }
       patch((current) => current.filter((candidate) => candidate.id !== goal.id))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function confirmDeleteGoal() {
+    if (!confirmDelete) return
+    setBusyId(confirmDelete.id)
+    try {
+      await deleteGoal(confirmDelete.id)
+      patch((current) => current.filter((candidate) => candidate.id !== confirmDelete.id))
+      setConfirmDelete(null)
     } finally {
       setBusyId(null)
     }
@@ -133,6 +147,15 @@ export default function MyGoals() {
                         <UnarchiveIcon size={18} />
                       )}
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(goal)}
+                      disabled={busyId === goal.id}
+                      aria-label={t('goals.deleteAction')}
+                      className="text-danger flex-none disabled:opacity-50"
+                    >
+                      <TrashIcon size={18} />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -171,6 +194,17 @@ export default function MyGoals() {
             ))}
           </div>
         </div>
+      ) : null}
+
+      {confirmDelete ? (
+        <ConfirmSheet
+          title={t('goals.deleteConfirmTitle')}
+          body={t('goals.deleteConfirmBody').replace('{title}', confirmDelete.title)}
+          confirmLabel={t('goals.deleteAction')}
+          busy={busyId === confirmDelete.id}
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={() => void confirmDeleteGoal()}
+        />
       ) : null}
     </main>
   )

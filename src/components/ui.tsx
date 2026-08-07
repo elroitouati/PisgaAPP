@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { CATEGORY_META, categoryStyle, type Category } from '@/lib/categories'
 import { useI18n } from '@/i18n/useI18n'
+import { WarningIcon } from '@/components/icons'
+import { Spinner } from '@/components/Spinner'
 
 /** The card surface used across every screen in the handoff. */
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
@@ -93,11 +95,101 @@ export function StatStrip({ stats }: { stats: { value: string; label: string }[]
   )
 }
 
-export function EmptyState({ children }: { children: ReactNode }) {
+export function EmptyState({
+  children,
+  actionLabel,
+  onAction,
+}: {
+  children: ReactNode
+  /** When given with onAction, the empty state becomes a tappable CTA. */
+  actionLabel?: string
+  onAction?: () => void
+}) {
+  if (actionLabel && onAction) {
+    return (
+      <button
+        type="button"
+        onClick={onAction}
+        className="text-fg-muted flex w-full flex-col items-center gap-1 rounded-[14px] border border-dashed border-[var(--color-line)] px-4 py-6 text-center text-[13px]"
+      >
+        <span>{children}</span>
+        <span className="text-[var(--cat)] font-semibold">{actionLabel}</span>
+      </button>
+    )
+  }
   return (
     <p className="text-fg-muted rounded-[14px] border border-dashed border-[var(--color-line)] px-4 py-6 text-center text-[13px]">
       {children}
     </p>
+  )
+}
+
+/**
+ * A destructive-action confirmation, styled like GoalCard's ConversionSheet
+ * (S7) — the one confirmation dialog already in the app before this one.
+ * Used for both deleting a goal and signing out.
+ */
+export function ConfirmSheet({
+  title,
+  body,
+  confirmLabel,
+  busy = false,
+  danger = true,
+  onCancel,
+  onConfirm,
+}: {
+  title: string
+  body: string
+  confirmLabel: string
+  busy?: boolean
+  /** False for a confirmation that isn't itself destructive (e.g. sign out). */
+  danger?: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  const { t } = useI18n()
+  return (
+    <div className="fixed inset-0 z-30 flex items-center justify-center px-[22px]">
+      <button
+        type="button"
+        aria-label={t('common.cancel')}
+        onClick={onCancel}
+        className="bg-scrim absolute inset-0"
+      />
+      <div className="border-line bg-surface relative w-full max-w-sm rounded-[20px] border px-[22px] pt-[26px] pb-[22px]">
+        <div className="flex flex-col items-center gap-3.5">
+          <div
+            className={`flex size-13 items-center justify-center rounded-full ${
+              danger ? 'bg-danger/15 text-danger' : 'bg-surface-raised text-fg-muted'
+            }`}
+          >
+            <WarningIcon size={26} />
+          </div>
+          <div className="text-center">
+            <div className="text-[17px] font-bold">{title}</div>
+            <p className="text-fg-muted mt-2 text-[13.5px] leading-relaxed">{body}</p>
+          </div>
+        </div>
+
+        <div className="mt-5.5 flex flex-col gap-2.5">
+          <PrimaryButton
+            className={danger ? 'bg-danger text-on-brand h-13' : 'h-13'}
+            disabled={busy}
+            onClick={onConfirm}
+          >
+            {busy ? <Spinner className="border-current/30 border-t-current" /> : null}
+            {confirmLabel}
+          </PrimaryButton>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="border-line text-fg-muted h-13 rounded-[14px] border text-[14.5px] font-semibold"
+          >
+            {t('common.cancel')}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

@@ -35,7 +35,14 @@ export function BottomNav() {
       <nav
         aria-label={t('nav.home')}
         className="border-line bg-bg/92 fixed inset-x-0 bottom-0 z-20 mx-auto flex h-[74px] max-w-md items-center justify-around border-t px-1.5 pb-2 backdrop-blur-[14px]"
-        style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
+        // Android 15+ (targetSdk 36) makes edge-to-edge mandatory — the app
+        // can no longer opt out, so the WebView now draws under the system
+        // gesture/button bar and env(safe-area-inset-bottom) is what's
+        // supposed to report its height. The floor of 0.875rem is a
+        // safety net for the case where that inset comes back as 0 or too
+        // small on a given device/nav mode: without it the bar would sit
+        // flush against the system buttons instead of just close to them.
+        style={{ paddingBottom: 'max(0.875rem, calc(0.5rem + env(safe-area-inset-bottom)))' }}
       >
         <Tab {...home} />
         <Tab {...achievements} />

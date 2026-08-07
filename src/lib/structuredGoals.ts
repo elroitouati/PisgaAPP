@@ -63,6 +63,101 @@ export type StructuredUserGoal = {
   converted_at: string | null
   added_at: string
   library: LibraryGoalRow | null
+  // Only meaningful when `library` is null — a from-scratch personal goal
+  // (S5) has nowhere else to keep the metric it was built with. Named with a
+  // personal_ prefix, not reused from goals_library's own column names: see
+  // the comment in 0016_personal_goal_metrics.sql for why that collision is
+  // real and was already tested, not theoretical. effectiveMetric() below is
+  // what every screen should read through rather than these directly.
+  personal_metric_unit: string | null
+  personal_metric_direction: MetricDirection | null
+  personal_level_step: number | null
+  personal_base_points: number
+}
+
+/**
+ * The metric/level shape a screen actually renders with, regardless of
+ * whether the goal came from the library, was converted from one, or was
+ * built from scratch in S5.
+ *
+ * Every screen that used to reach for `goal.library!.metric_unit` (etc.)
+ * should read this instead — that non-null assertion was exactly what made
+ * a from-scratch personal goal spin forever, since `library` is genuinely
+ * null for one and nothing ever throws to say so.
+ */
+export type EffectiveMetric = {
+  metricUnit: string
+  metricDirection: MetricDirection
+  levelStep: number
+  basePoints: number
+}
+
+export function effectiveMetric(goal: StructuredUserGoal): EffectiveMetric {
+  if (goal.library) {
+    return {
+      metricUnit: goal.library.metric_unit,
+      metricDirection: goal.library.metric_direction,
+      levelStep: goal.library.level_step,
+      basePoints: goal.library.base_points,
+    }
+  }
+  return {
+    metricUnit: goal.personal_metric_unit ?? 'פעמים',
+    metricDirection: goal.personal_metric_direction ?? 'up',
+    levelStep: goal.personal_level_step ?? 1,
+    basePoints: goal.personal_base_points,
+  }
+}
+
+/**
+ * A library row when there is one, else a synthetic one built from the
+ * goal's own personal_* columns — for VS screens (Verify.tsx), which were
+ * written against `goal.library` as a hard requirement throughout and, like
+ * GoalCard, would otherwise spin forever for a from-scratch personal goal.
+ *
+ * Filling in a full LibraryGoalRow rather than making every screen handle
+ * `library: LibraryGoalRow | null` individually: those screens read a dozen
+ * different library fields between them (session_config, metric_key,
+ * verification_allowed, code, description_*...), and most already degrade
+ * sensibly on missing/empty values (`session_config?.sets ?? 3` and
+ * similar). One synthetic object is a smaller, more honest change than
+ * threading optionality through every one of those call sites, and it keeps
+ * the invariant "a VS screen can assume its library prop is real" true for
+ * everyone downstream instead of almost everyone.
+ */
+export function effectiveLibrary(goal: StructuredUserGoal): LibraryGoalRow {
+  if (goal.library) return goal.library
+
+  const metric = effectiveMetric(goal)
+  return {
+    id: '',
+    code: '',
+    title_he: goal.title,
+    title_en: goal.title,
+    description_he: null,
+    description_en: null,
+    category: goal.category,
+    subcategory: null,
+    metric_key: '',
+    metric_unit: metric.metricUnit,
+    metric_direction: metric.metricDirection,
+    metric_ceiling: null,
+    base_points: metric.basePoints,
+    level_1_value: goal.current_level_value ?? metric.levelStep,
+    level_1_weekly_value: null,
+    level_step: metric.levelStep,
+    verification_default: goal.verification_code ?? 'V0',
+    // No known alternatives for a from-scratch goal — VS2's fallback list is
+    // simply empty for one, which is a real (if minor) gap: a personal V2
+    // goal has no library row for my_health_goals() to find either, so
+    // sensor sync for a personal goal is a known, unimplemented edge case,
+    // not something this fallback is pretending to solve.
+    verification_allowed: [],
+    calibration_questions: [],
+    custom_widget: null,
+    measurement_window: 'week',
+    session_config: {},
+  }
 }
 
 export type WeeklyMetricsRow = {
@@ -113,7 +208,8 @@ export async function fetchLibraryGoal(libraryId: string): Promise<LibraryGoalRo
 const USER_GOAL_FIELDS =
   'id, user_id, library_id, is_custom, title, category, verification_code,' +
   ' current_level_value, personal_record_value, level_changed_at, target_frequency,' +
-  ' counts_for_ranking, converted_from_goal_id, converted_at, added_at'
+  ' counts_for_ranking, converted_from_goal_id, converted_at, added_at,' +
+  ' personal_metric_unit, personal_metric_direction, personal_level_step, personal_base_points'
 
 export async function fetchStructuredGoal(userGoalId: string): Promise<StructuredUserGoal> {
   const goal = unwrap(
@@ -255,18 +351,32 @@ export function levelCooldownRemainingMs(goal: StructuredUserGoal): number {
   return Math.max(0, 72 * 60 * 60 * 1000 - elapsed)
 }
 
-/** What the level becomes if the button is pressed — S3 previews this. */
+/**
+ * What the level becomes if the button is pressed — S3 previews this.
+ *
+ * Mirrors change_goal_level's own clamp exactly (0017): for an up-direction
+ * metric, level_1_value (or one level step, for a from-scratch personal
+ * goal with no library value on record) is a FLOOR. For a down-direction
+ * metric it is a CEILING instead — level_1_value is the beginner's worst
+ * value, and a `down` goal only ever improves by falling. A from-scratch
+ * down-direction goal has no such ceiling to fall from, so its guard is a
+ * floor too, at one level step rather than zero: user_goals.current_level_
+ * value has a > 0 check, so a from-scratch goal is never allowed to reach
+ * zero either.
+ */
 export function nextLevelValue(goal: StructuredUserGoal, direction: 'up' | 'down'): number | null {
-  const { library, current_level_value: current } = goal
-  if (!library || current === null) return null
+  const { current_level_value: current } = goal
+  if (current === null) return null
 
+  const { metricDirection, levelStep } = effectiveMetric(goal)
   const better = direction === 'up'
-  const towardsHigher = better === (library.metric_direction === 'up')
-  const next = towardsHigher ? current + library.level_step : current - library.level_step
+  const towardsHigher = better === (metricDirection === 'up')
+  const next = towardsHigher ? current + levelStep : current - levelStep
 
-  return library.metric_direction === 'up'
-    ? Math.max(next, library.level_1_value)
-    : Math.min(next, library.level_1_value)
+  if (metricDirection === 'up') {
+    return Math.max(next, goal.library?.level_1_value ?? levelStep)
+  }
+  return goal.library ? Math.min(next, goal.library.level_1_value) : Math.max(next, levelStep)
 }
 
 // ── Completions (the VS screens) ────────────────────────────────────────────

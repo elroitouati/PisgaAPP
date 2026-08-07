@@ -10,6 +10,7 @@ import {
   convertGoalToPersonal,
   convertGoalToStructured,
   conversionCooldownRemainingMs,
+  effectiveMetric,
   fetchStructuredGoal,
   levelCooldownRemainingMs,
   nextLevelValue,
@@ -94,7 +95,11 @@ export default function GoalCard() {
     }
   }
 
-  if (!goal || !library) {
+  // Only `goal` is required. `library` used to be required too, but a
+  // from-scratch personal goal (S5) genuinely has none — that non-null
+  // requirement was what made opening one spin forever: nothing ever set
+  // `library`, so this screen never got past its own loading state.
+  if (!goal) {
     return (
       <main className="flex min-h-dvh items-center justify-center">
         <Spinner className="size-7" />
@@ -102,11 +107,18 @@ export default function GoalCard() {
     )
   }
 
+  const metric = effectiveMetric(goal)
   const nextUp = nextLevelValue(goal, 'up')
   const nextDown = nextLevelValue(goal, 'down')
-  // The user's own copy is what the header shows; the library title is the
-  // fallback for a goal adopted before a language switch.
-  const title = goal.title || (lang === 'he' ? library.title_he : library.title_en)
+  // The user's own copy is what the header shows; the library title is only
+  // a fallback for a library goal adopted before a language switch — a
+  // from-scratch personal goal has no library title to fall back to at all.
+  const title = goal.title || (library ? (lang === 'he' ? library.title_he : library.title_en) : '')
+  // The gear opens S7 (convert between the two economies), which only makes
+  // sense for a goal that has, or once had, a library origin: converting a
+  // from-scratch personal goal "back" to structured always fails server-side
+  // ("this goal was never a structured goal"), because it never was one.
+  const canConvert = goal.library_id !== null || goal.converted_from_goal_id !== null
 
   return (
     <main
@@ -123,19 +135,24 @@ export default function GoalCard() {
           <BackIcon size={21} />
         </button>
         <span className="text-[17px] font-bold">{title}</span>
-        <button
-          type="button"
-          onClick={() => setConverting(true)}
-          aria-label={t('sg.convertTitle')}
-          className="text-fg-muted flex"
-        >
-          <GearIcon size={21} />
-        </button>
+        {canConvert ? (
+          <button
+            type="button"
+            onClick={() => setConverting(true)}
+            aria-label={t('sg.convertTitle')}
+            className="text-fg-muted flex"
+          >
+            <GearIcon size={21} />
+          </button>
+        ) : (
+          // Reserves the gear's width so the title stays centered either way.
+          <span className="size-[21px]" />
+        )}
       </header>
 
       <span className="flex-shrink-0 self-start rounded-full border border-[color-mix(in_oklch,var(--cat)_45%,var(--color-line))] px-3 py-1 text-[12.5px] font-semibold text-[var(--cat)]">
         {t(CATEGORY_META[goal.category].labelKey)}
-        {library.subcategory ? ` · ${library.subcategory}` : ''}
+        {library?.subcategory ? ` · ${library.subcategory}` : ''}
       </span>
 
       {!goal.counts_for_ranking ? (
@@ -146,10 +163,12 @@ export default function GoalCard() {
 
       <div className="mt-1.5 flex-shrink-0 text-center">
         <div className="text-[26px] font-bold">
-          {describeOpeningLevel(library, goal.current_level_value ?? library.level_1_value)}
+          {library
+            ? describeOpeningLevel(library, goal.current_level_value ?? library.level_1_value)
+            : `${formatValue(goal.current_level_value ?? 0)} ${metric.metricUnit}`}
         </div>
         <div className="text-fg-muted mt-1.5 text-[13px]">
-          {t('sg.yourRecord')}: {formatValue(goal.personal_record_value ?? 0)} {library.metric_unit}
+          {t('sg.yourRecord')}: {formatValue(goal.personal_record_value ?? 0)} {metric.metricUnit}
         </div>
       </div>
 
@@ -159,7 +178,7 @@ export default function GoalCard() {
 
       <div className="flex flex-shrink-0 gap-2.5">
         <Stat value={String(streak ?? 0)} label={t('sg.streakDays')} />
-        <Stat value={String(library.base_points)} label={t('sg.pointsPerRun')} />
+        <Stat value={String(metric.basePoints)} label={t('sg.pointsPerRun')} />
         {/* Q2's answer, not the metric key: how often the user said they would
             do this is what the streak and the weekly total are measured
             against, and it is the only one of the three they chose. */}
@@ -176,7 +195,10 @@ export default function GoalCard() {
         className="text-on-cat mt-1 flex-shrink-0 bg-[var(--cat)]"
         onClick={() => navigate(`/goal/${goal.id}/verify`)}
       >
-        {library.verification_default === 'V3' || library.verification_default === 'V1'
+        {/* goal.verification_code, not library.verification_default — the
+            two agree for a library goal, and a from-scratch personal goal
+            has only the former. */}
+        {goal.verification_code === 'V3' || goal.verification_code === 'V1'
           ? t('sg.startWorkout')
           : t('sg.start')}
       </PrimaryButton>
@@ -290,7 +312,7 @@ function LevelSheet({
   onConfirm: () => void
 }) {
   const { t } = useI18n()
-  const library = goal.library!
+  const metric = effectiveMetric(goal)
   const current = goal.current_level_value ?? 0
   const record = goal.personal_record_value ?? current
 
@@ -298,12 +320,12 @@ function LevelSheet({
   const nextMultiplier =
     nextValue === null || record <= 0
       ? 1
-      : Math.min(1, Math.max(0.6, library.metric_direction === 'up' ? nextValue / record : record / nextValue))
-  const currentPoints = Math.round(library.base_points)
-  const nextPoints = Math.round(library.base_points * nextMultiplier)
+      : Math.min(1, Math.max(0.6, metric.metricDirection === 'up' ? nextValue / record : record / nextValue))
+  const currentPoints = Math.round(metric.basePoints)
+  const nextPoints = Math.round(metric.basePoints * nextMultiplier)
   const isNewRecord =
     nextValue !== null &&
-    (library.metric_direction === 'up' ? nextValue > record : nextValue < record)
+    (metric.metricDirection === 'up' ? nextValue > record : nextValue < record)
 
   return (
     <div className="fixed inset-0 z-30">
@@ -326,7 +348,7 @@ function LevelSheet({
             {nextValue === null ? '—' : formatValue(nextValue)}
           </span>
         </div>
-        <div className="text-fg-muted mt-1 text-center text-[13px]">{library.metric_unit}</div>
+        <div className="text-fg-muted mt-1 text-center text-[13px]">{metric.metricUnit}</div>
 
         <div className="bg-surface-raised mt-5.5 rounded-[14px] px-4 py-3.5 text-[13px] leading-relaxed">
           {direction === 'down'
@@ -335,7 +357,7 @@ function LevelSheet({
                 .replace('{to}', String(nextPoints))
                 .replace('{record}', formatValue(record))
             : isNewRecord
-              ? t('sg.bonusExplain').replace('{bonus}', String(Math.round(library.base_points * 0.5)))
+              ? t('sg.bonusExplain').replace('{bonus}', String(Math.round(metric.basePoints * 0.5)))
               : t('sg.recordKept')}
         </div>
 

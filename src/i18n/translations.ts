@@ -19,6 +19,8 @@ const he = {
   'common.save': 'שמירה',
   'common.close': 'סגירה',
   'common.signOut': 'התנתקות',
+  'profile.signOutConfirmTitle': 'להתנתק?',
+  'profile.signOutConfirmBody': 'תצטרך/י להתחבר שוב כדי להמשיך לעקוב אחרי המטרות שלך.',
   'common.language': 'שפה',
   'common.theme': 'ערכת נושא',
   'common.theme.light': 'בהיר',
@@ -106,7 +108,7 @@ const he = {
   'home.allDone': 'סיימת הכול להיום',
   'home.stat.streak': 'רצף ימים',
   'home.stat.points': 'נקודות',
-  'home.stat.badges': 'באדג׳ים',
+  'home.stat.badges': 'פיקים',
   'home.categories': 'הקטגוריות שלך',
   'home.goalsToday': 'מטרות היום',
   'home.empty': 'עוד לא הוספת מטרות. הקישו על ＋ כדי להתחיל.',
@@ -118,7 +120,9 @@ const he = {
   'cat.structured': 'מטרות מובנות · נכנסות לדירוג',
   'cat.personal': 'מטרות אישיות · לא בדירוג',
   'cat.emptyStructured': 'אין כאן מטרות מובנות עדיין.',
+  'cat.addStructured': 'הוספת מטרה מובנית +',
   'cat.emptyPersonal': 'אין כאן מטרות אישיות עדיין.',
+  'cat.addPersonal': 'הוספת מטרה אישית +',
 
   // Verification (PRD 5)
   'verify.guided.start': 'התחלת אימון',
@@ -231,10 +235,10 @@ const he = {
   'shared.invite': 'שלח הזמנה',
 
   'badges.title': 'הישגים',
-  'badges.collected': 'באדג׳ים נאספו',
+  'badges.collected': 'פיקים נאספו',
   'badges.recent': 'נאספו לאחרונה',
   'badges.locked': 'עדיין נעולים',
-  'badges.none': 'עוד לא אספת באדג׳ים. כל מטרה שתשלימו מקרבת אתכם.',
+  'badges.none': 'עוד לא אספת פיקים. כל מטרה שתשלימו מקרבת אתכם.',
 
   'setup.title': 'חסרה הגדרת Supabase',
   'setup.body':
@@ -441,6 +445,9 @@ const he = {
   'goals.daysUnit': 'ימים',
   'goals.archiveAction': 'העברה לארכיון',
   'goals.unarchiveAction': 'החזרה מארכיון',
+  'goals.deleteAction': 'מחיקה',
+  'goals.deleteConfirmTitle': 'למחוק את המטרה?',
+  'goals.deleteConfirmBody': 'זה ימחק לצמיתות את "{title}" ואת כל ההיסטוריה שלה. אי אפשר לבטל.',
 
   // iOS push explainer (design 8i/8j)
   'push.title': 'קבלו תזכורות גם באייפון',
@@ -450,7 +457,7 @@ const he = {
   'push.step2': 'בחרו "הוסף למסך הבית"',
   'push.done': 'הבנתי',
   'push.enableTitle': 'קבלו התראות מ‑Pisga',
-  'push.enableBody': 'נתריע לכם על באדג׳ שהושג, מטרה שהושלמה ותזכורת אם שכחתם יום.',
+  'push.enableBody': 'נתריע לכם על פיק שהושג, מטרה שהושלמה ותזכורת אם שכחתם יום.',
   'push.enableButton': 'הפעלת התראות',
   'push.enabled': 'ההתראות פעילות',
   'push.denied': 'ההתראות חסומות בהגדרות המכשיר',
@@ -515,6 +522,8 @@ const en: Record<TranslationKey, string> = {
   'common.save': 'Save',
   'common.close': 'Close',
   'common.signOut': 'Sign out',
+  'profile.signOutConfirmTitle': 'Sign out?',
+  'profile.signOutConfirmBody': "You'll need to sign back in to keep tracking your goals.",
   'common.language': 'Language',
   'common.theme': 'Theme',
   'common.theme.light': 'Light',
@@ -598,7 +607,7 @@ const en: Record<TranslationKey, string> = {
   'home.allDone': 'You’re done for today',
   'home.stat.streak': 'Day streak',
   'home.stat.points': 'Points',
-  'home.stat.badges': 'Badges',
+  'home.stat.badges': 'Peaks',
   'home.categories': 'Your categories',
   'home.goalsToday': 'Today’s goals',
   'home.empty': 'No goals yet. Tap ＋ to get started.',
@@ -609,7 +618,9 @@ const en: Record<TranslationKey, string> = {
   'cat.structured': 'Library goals · counted in ranking',
   'cat.personal': 'Personal goals · not ranked',
   'cat.emptyStructured': 'No library goals here yet.',
+  'cat.addStructured': 'Add a structured goal +',
   'cat.emptyPersonal': 'No personal goals here yet.',
+  'cat.addPersonal': 'Add a personal goal +',
 
   'verify.guided.start': 'Start session',
   'verify.checkin.question': 'Did you stick to it today?',
@@ -720,10 +731,10 @@ const en: Record<TranslationKey, string> = {
   'shared.invite': 'Send an invite to',
 
   'badges.title': 'Achievements',
-  'badges.collected': 'badges collected',
+  'badges.collected': 'peaks collected',
   'badges.recent': 'Recently earned',
   'badges.locked': 'Still locked',
-  'badges.none': 'No badges yet. Every goal you finish brings one closer.',
+  'badges.none': 'No peaks yet. Every goal you finish brings one closer.',
 
   'setup.title': 'Supabase is not configured',
   'setup.body':
@@ -915,6 +926,9 @@ const en: Record<TranslationKey, string> = {
   'goals.daysUnit': 'days',
   'goals.archiveAction': 'Move to archive',
   'goals.unarchiveAction': 'Restore from archive',
+  'goals.deleteAction': 'Delete',
+  'goals.deleteConfirmTitle': 'Delete this goal?',
+  'goals.deleteConfirmBody': 'This permanently deletes "{title}" and its whole history. This can\'t be undone.',
 
   'push.title': 'Get reminders on iPhone too',
   'push.body':
@@ -924,7 +938,7 @@ const en: Record<TranslationKey, string> = {
   'push.done': 'Got it',
   'push.enableTitle': 'Get notified by Pisga',
   'push.enableBody':
-    'We’ll let you know about a new badge, a finished goal, and a reminder if you forget a day.',
+    'We’ll let you know about a new peak, a finished goal, and a reminder if you forget a day.',
   'push.enableButton': 'Enable notifications',
   'push.enabled': 'Notifications are on',
   'push.denied': 'Notifications are blocked in your device settings',

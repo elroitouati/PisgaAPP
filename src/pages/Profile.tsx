@@ -1,9 +1,10 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useI18n } from '@/i18n/useI18n'
 import { useAuth } from '@/providers/useAuth'
 import { useProfile } from '@/providers/useProfile'
 import { ThemeSwitch } from '@/components/ThemeSwitch'
-import { Card, SectionLabel } from '@/components/ui'
+import { Card, ConfirmSheet, SectionLabel } from '@/components/ui'
 import {
   BackIcon,
   BellIcon,
@@ -20,6 +21,7 @@ export default function Profile() {
   const { user, signOut } = useAuth()
   const { profile } = useProfile()
   const navigate = useNavigate()
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false)
 
   return (
     <>
@@ -93,11 +95,24 @@ export default function Profile() {
 
       <button
         type="button"
-        onClick={() => void signOut()}
-        className="border-line text-fg-muted mt-auto rounded-[14px] border py-3.5 text-sm font-medium"
+        onClick={() => setConfirmingSignOut(true)}
+        className="border-danger/40 text-danger mt-auto rounded-[14px] border py-3.5 text-sm font-medium"
       >
         {t('common.signOut')}
       </button>
+
+      {/* Asked every time on purpose — sign-out is rare and hard to undo
+          accidentally, so a "don't ask again" toggle would just be one more
+          setting nobody needs. Every major app confirms this every time. */}
+      {confirmingSignOut ? (
+        <ConfirmSheet
+          title={t('profile.signOutConfirmTitle')}
+          body={t('profile.signOutConfirmBody')}
+          confirmLabel={t('common.signOut')}
+          onCancel={() => setConfirmingSignOut(false)}
+          onConfirm={() => void signOut()}
+        />
+      ) : null}
     </>
   )
 }
