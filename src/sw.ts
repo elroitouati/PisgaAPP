@@ -22,11 +22,14 @@ registerRoute(
   }),
 )
 
-// registerType: 'autoUpdate' posts this once a new worker is installed and
-// waiting; injectManifest doesn't wire skipWaiting for you the way generateSW
-// does, so the custom worker has to listen for it itself.
-self.addEventListener('message', (event) => {
-  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting()
+// generateSW bakes skipWaiting/clientsClaim into the worker it produces for
+// registerType: 'autoUpdate'; injectManifest doesn't, so the custom worker
+// has to do it itself. Without this a Capacitor WebView — which never
+// actually "closes" the way a browser tab does — leaves every future update
+// stuck in the waiting state forever, since nothing else can trigger it.
+self.skipWaiting()
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim())
 })
 
 type PushPayload = {
