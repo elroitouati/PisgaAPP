@@ -25,6 +25,17 @@ const config: CapacitorConfig = {
     // current. Declared here so it is visible rather than buried in Gradle.
     allowMixedContent: false,
   },
+  plugins: {
+    // Samsung's bundled WebView (Chromium < 140) reports env(safe-area-inset-*)
+    // as 0px even in edge-to-edge mode — the bottom nav and CTA buttons sit
+    // flush against the 3-button nav bar as a result. @capacitor-community/
+    // safe-area detects this and pads the WebView natively instead; letting
+    // Capacitor's own SystemBars inset handling run alongside it double-counts
+    // the inset, so it's turned off per the plugin's setup instructions.
+    SystemBars: {
+      insetsHandling: 'disable',
+    },
+  },
 }
 
 export default config

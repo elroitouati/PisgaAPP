@@ -121,7 +121,7 @@ export default function GoalCard() {
   return (
     <main
       style={{ ...categoryStyle(goal.category), paddingTop: 'calc(3.25rem + env(safe-area-inset-top))' }}
-      className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4.5 px-[22px] pb-23"
+      className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4.5 px-[22px] pb-safe-lg"
     >
       <header className="flex flex-shrink-0 items-center justify-between">
         <button

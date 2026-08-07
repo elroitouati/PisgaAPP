@@ -48,7 +48,7 @@ export default function GoalProgress() {
   return (
     <main
       style={{ ...categoryStyle(goal.category), paddingTop: 'calc(3.5rem + env(safe-area-inset-top))' }}
-      className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-5 px-[22px] pb-10"
+      className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-5 px-[22px] pb-safe"
     >
       <header className="flex flex-shrink-0 items-center gap-3">
         <button

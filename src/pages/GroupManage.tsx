@@ -137,7 +137,7 @@ export default function GroupManage() {
 
   return (
     <main
-      className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-5.5 px-[22px] pt-14 pb-8"
+      className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-5.5 px-[22px] pt-14 pb-safe"
       style={{ paddingTop: 'calc(3.5rem + env(safe-area-inset-top))' }}
     >
       <header className="flex flex-shrink-0 items-center gap-3">

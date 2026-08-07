@@ -97,7 +97,7 @@ export default function Verify() {
   return (
     <main
       style={{ ...categoryStyle(goal.category), paddingTop: 'calc(3.5rem + env(safe-area-inset-top))' }}
-      className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4.5 px-[26px] pb-10"
+      className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4.5 px-[26px] pb-safe"
     >
       <header className="flex flex-shrink-0 items-center gap-3">
         <button

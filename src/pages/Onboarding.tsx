@@ -72,7 +72,7 @@ export default function Onboarding() {
 
   return (
     <main
-      className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-[26px] pt-14 pb-9"
+      className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-[26px] pt-14 pb-safe"
       style={{ paddingTop: 'calc(3.5rem + env(safe-area-inset-top))' }}
     >
       <header className="flex items-center justify-between">

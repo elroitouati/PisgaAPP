@@ -154,6 +154,28 @@
     background: color-mix(in oklch, var(--cat) 15%, var(--pisga-tint-base));
     color: var(--cat);
   }
+
+  /*
+   * Bottom clearance for every full-bleed screen. Was a flat pb-8/9/10
+   * Tailwind class on ~17 pages — no env(safe-area-inset-bottom) at all — so
+   * a bottom CTA sat with only that fixed ~32-40px against whatever the
+   * device's own gesture/button bar actually needs. Fine on a device that
+   * reports a small inset; on the Samsung 3-button nav that surfaced this,
+   * the button sat flush against the system bar, no gap at all, the exact
+   * "Instagram has a gap, we don't" comparison. env() adds the real inset on
+   * top of the fixed value rather than replacing it, so there is still
+   * breathing room even where the OS reports nothing.
+   */
+  .pb-safe {
+    padding-bottom: calc(2.5rem + env(safe-area-inset-bottom));
+  }
+
+  /* GoalCard (S1) stacks the primary action, two level buttons and a text
+     link below the fold — the same idea as AppShell's own 92px bottom
+     clearance, just on a screen that isn't wrapped in AppShell. */
+  .pb-safe-lg {
+    padding-bottom: calc(5.75rem + env(safe-area-inset-bottom));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

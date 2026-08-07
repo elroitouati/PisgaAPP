@@ -88,7 +88,7 @@ export default function Calibrate() {
   return (
     <main
       style={{ ...categoryStyle(library.category), paddingTop: 'calc(3.5rem + env(safe-area-inset-top))' }}
-      className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-5.5 px-[26px] pb-10"
+      className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-5.5 px-[26px] pb-safe"
     >
       <div className="flex-shrink-0">
         <div className="text-[22px] font-bold">{t('sg.calibrateTitle')}</div>

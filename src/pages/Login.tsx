@@ -102,7 +102,7 @@ export default function Login() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col px-6 pt-16 pb-9">
+    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col px-6 pt-16 pb-safe">
       <ThemeSwitch className="self-end" />
 
       {/* The full mountain lockup is reserved for this screen (PRD 7). */}

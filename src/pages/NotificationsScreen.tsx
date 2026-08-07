@@ -69,7 +69,7 @@ export default function NotificationsScreen() {
   if (needsIOSInstall) {
     return (
       <main
-        className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-[26px] pt-14 pb-8"
+        className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-[26px] pt-14 pb-safe"
         style={{ paddingTop: 'calc(3.5rem + env(safe-area-inset-top))' }}
       >
         <button
@@ -104,7 +104,7 @@ export default function NotificationsScreen() {
 
   return (
     <main
-      className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 px-[26px] pt-14 pb-8"
+      className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 px-[26px] pt-14 pb-safe"
       style={{ paddingTop: 'calc(3.5rem + env(safe-area-inset-top))' }}
     >
       <header className="flex flex-shrink-0 items-center gap-3">

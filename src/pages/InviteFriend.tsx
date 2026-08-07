@@ -59,7 +59,7 @@ export default function InviteFriend() {
   return (
     <main
       style={{ ...categoryStyle('social'), paddingTop: 'calc(3.5rem + env(safe-area-inset-top))' }}
-      className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-[26px] pb-8"
+      className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-[26px] pb-safe"
     >
       <header className="flex flex-shrink-0 items-center gap-3">
         <button

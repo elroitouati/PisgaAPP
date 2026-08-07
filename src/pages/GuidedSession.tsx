@@ -61,7 +61,7 @@ function SessionRunner({
   return (
     <main
       style={categoryStyle(goal.category)}
-      className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-[26px] pt-14 pb-10"
+      className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-[26px] pt-14 pb-safe"
     >
       <header className="flex items-center justify-between">
         <button
