@@ -15,7 +15,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
  */
 const config: CapacitorConfig = {
   appId: 'app.pisga.mobile',
-  appName: 'פסגה',
+  appName: 'PISGA',
   webDir: 'dist',
   // The shell loads the built assets from disk, not from a server, so the app
   // opens without a network round trip and the existing service worker keeps

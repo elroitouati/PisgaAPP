@@ -7,7 +7,7 @@ export const LANG_DIR: Record<Lang, 'rtl' | 'ltr'> = { he: 'rtl', en: 'ltr' }
 export const LANG_LABEL: Record<Lang, string> = { he: 'עברית', en: 'English' }
 
 const he = {
-  'app.name': 'פסגה',
+  'app.name': 'PISGA',
   'app.wordmark': 'PISGA',
 
   'common.loading': 'טוען…',

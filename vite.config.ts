@@ -10,7 +10,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['favicon.png'],
       // injectManifest (a hand-written service worker) rather than
       // generateSW: push notifications need a `push` and a
       // `notificationclick` listener, which generateSW's auto-built worker
@@ -22,8 +22,8 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
       },
       manifest: {
-        name: 'פסגה',
-        short_name: 'פסגה',
+        name: 'PISGA',
+        short_name: 'PISGA',
         description: 'אפליקציית שיפור עצמי ומוטיבציה יומיומית',
         lang: 'he',
         dir: 'rtl',
