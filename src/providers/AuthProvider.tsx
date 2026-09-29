@@ -41,12 +41,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let active = true
 
-    supabase.auth
-      .getSession()
+    // getSession() should resolve near-instantly even with nothing in
+    // storage — but if it ever hangs (a stalled request, a stuck internal
+    // lock, anything network-shaped) the whole app is otherwise stuck on
+    // the loading screen forever, with no way to even reach /login. A
+    // bounded wait guarantees the app always becomes usable.
+    let timeoutId: ReturnType<typeof setTimeout>
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error('Timed out loading the session')), 8000)
+    })
+
+    Promise.race([supabase.auth.getSession(), timeout])
       .then(({ data }) => {
         if (active) setSession(data.session)
       })
+      .catch(() => {
+        if (active) setSession(null)
+      })
       .finally(() => {
+        clearTimeout(timeoutId)
         if (active) setInitializing(false)
       })
 
